@@ -632,6 +632,7 @@ const CODEX={
 // ---------- QUESTS ----------
 // stages: [{text, done(g)}]  reward applied on final completion. hidden quests start via flags.
 const QUESTS={
+ first_steps:{name:'A Foothold',fac:'saints',desc:'Start at the Last Light. Mags has local leads; Wren at Saints Hall offers work. Your locker is available through the beds.',stages:[{text:'Talk to Mags at the Last Light.',done:g=>g.flags.greeted_mags||g.flags.met_mags},{text:'Recover Wren\'s package from Delmar Apartments and return it to Wren at Saints Hall.',done:g=>g.flags.wren_package_done}],reward:{xp:40}},
  wren_package:{name:"Wren's Package",fac:'saints',desc:'Wren wants a package back from the Delmar Apartments stash. Scavs moved in after the Saints moved out.',
   stages:[{text:'Recover the package from the Delmar Apartments (Ashgrove).',done:g=>Game.hasItem('wren_package')},{text:'Bring it to Wren at Saints Hall.',done:g=>G.flags.wren_package_done}],
   reward:{xp:80,creds:60,rep:{saints:20}}},
@@ -654,9 +655,9 @@ const QUESTS={
  dossier:{name:'The Dossier',fac:'halcyon',desc:'Director Ives wants the Union\'s dossier: routes, caches, names. It\'s in a locked room in the Union Hall.',
   stages:[{text:'Get the Union Dossier from Foundry Union Hall (Verge).',done:g=>Game.hasItem('dossier')||G.flags.dossier_burned},{text:'Deliver it to Ives — or burn it and tell Dace.',done:g=>G.flags.dossier_done||G.flags.dossier_burned}],reward:{xp:150,creds:200,rep:{halcyon:30}}},
  skyhook:{name:'Skyhook',fac:'halcyon',desc:'There is a helicopter on Halcyon Tower\'s rooftop hangar. It needs a tail rotor (Verge Machine Works), aviation fuel (Fuel Depot at the docks, or the Tower), and a way onto the roof: Halcyon clearance, a keycard, a hack, or a breach charge.',
-  stages:[{text:'Acquire a Rotor Assembly and Aviation Fuel.',done:g=>Game.hasItem('rotor')&&Game.hasItem('avgas')},{text:'Reach the Rooftop Hangar (Carbon Heights) and repair the helicopter.',done:g=>G.flags.heli_ready},{text:'Fly.',done:g=>false}],reward:{xp:100}},
- boat:{name:"Kesh's Boat",fac:null,desc:'Old Kesh has a boat and no motor. Outboards were made at Verge Machine Works; one sits in the Flooded Warehouse at the docks, under the Bloat Mother. Kesh needs fuel too, and the channel clear — the Drowned or the Mother.',
-  stages:[{text:'Bring Kesh an Outboard Motor and 2 Fuel Cans.',done:g=>G.flags.boat_parts},{text:'Clear the channel: kill the Bloat Mother, or reach +20 with the Drowned.',done:g=>G.flags.channel_clear},{text:'Push off from the pier at Kesh\'s.',done:g=>false}],reward:{xp:100}},
+  stages:[{text:'Acquire a Rotor Assembly and Aviation Fuel.',done:g=>g.flags.heli_ready||(Game.hasItem('rotor')&&Game.hasItem('avgas'))},{text:'Reach the Rooftop Hangar (Carbon Heights) and repair the helicopter.',done:g=>G.flags.heli_ready},{text:'Fly.',done:g=>false}],reward:{xp:100}},
+ boat:{name:"Kesh's Boat",fac:null,desc:'Prepare a hull, motor, fuel and provisions at Kesh\'s shack in Rust Docks. Deliveries persist independently. The channel can be won through Drowned goodwill, force, or a technical decoy.',
+  stages:[{text:'Seal the hull: Repair 2 and salvage, extra salvage, or Kesh\'s paid help.',done:g=>Game.boatState().hull},{text:'Mount an Outboard Motor from Verge Machine Works or the Flooded Warehouse.',done:g=>Game.boatState().motor},{text:'Deliver 2 Fuel Cans to the boat.',done:g=>Game.boatState().fuel},{text:'Pack food and water, or buy provisions from Kesh.',done:g=>Game.boatState().supplies},{text:'Secure passage: Drowned +20, defeat the Mother, or rig a decoy (Repair/Hacking 3).',done:g=>!!Game.boatPassage()},{text:'Launch from Kesh\'s boat in Rust Docks.',done:g=>false}],reward:{xp:100}},
  rite:{name:'The Open Door',fac:'drowned',desc:'Brother Ludo offers the first graft freely. The body is a door; he only asks you to open it.',
   stages:[{text:'Accept a Flesh graft, or bring Ludo 3 Dubious Meat as offering.',done:g=>G.p.flesh.length>0||G.flags.rite_meat}],reward:{xp:80,rep:{drowned:25}}},
  chorus:{name:'The Chorus',fac:'choir',desc:'Cantor Nine says three Signal Shards will open the Heart. Shards fall out of Echo events, Static Walkers, and the terminals in the Static.',
@@ -789,7 +790,7 @@ DLG.dace={
    {t:'I have 3 Industrial Power Cells.',cond:()=>qa('power')&&has('powercell',3)&&!F('power_done'),act:()=>{Game.removeItem('powercell',3);set('power_done');set('platform_open');Game.log('Dace hefts them. "Platform\'s in the Sump, south chamber. Throw the switch. We\'ll be waiting."','#e96');},next:'start'},
    {t:'The drone relay.',cond:()=>qd('power')||qa('power'),next:'relay'},{t:'The relay is down.',cond:()=>qa('picket')&&F('relay_down'),act:()=>{set('picket_done');Game.completeQuest('picket');},next:'thanks'},
    {t:'Halcyon wanted your dossier. I burned it.',cond:()=>F('dossier_burned')&&!F('dossier_told'),act:()=>{set('dossier_told');Game.addRep('union',30);Game.addRep('halcyon',-30);Game.unlockGate('verge','docks');Game.log('Dace is quiet. "Docks gate is open to you. Always."','#e96');},next:'start'},
-   {t:'[Union +30] The shortcut to the docks?',cond:()=>rep('union')>=30&&!G.flags['gate_verge_docs'],act:()=>{Game.unlockGate('verge','docks');Game.log('Dace tosses you a key. "South gate. Don\'t tell the Hands."','#e96');},next:'start'},{t:'Leave.',act:()=>set('met_dace'),next:'end'}]};},
+   {t:'[Union +30] The shortcut to the docks?',cond:()=>rep('union')>=30&&!G.flags['gate_verge_docks'],act:()=>{Game.unlockGate('verge','docks');Game.log('Dace tosses you a key. "South gate. Don\'t tell the Hands."','#e96');},next:'start'},{t:'Leave.',act:()=>set('met_dace'),next:'end'}]};},
  train:g=>({text:'"Undercity Line. Runs under the whole city and out the other side. Track\'s fine. Switch is fine. Power isn\'t. Three industrial cells — the kind Halcyon hoards, the kind the mall security vault has, the kind we left in the Machine Works before the hounds moved in — and we ride out." She looks at you. "We\'d take you. We\'d take anyone who brought the cells."',opts:[{t:'I\'ll find them.',act:()=>{set('met_dace');Game.startQuest('power');},next:'end'}]}),
  relay:g=>({text:'"Halcyon has a drone relay on the east side. Every drone that\'s ever shot a picket came through it. Hack it, blow it, wreck the generator — I don\'t care. Just make it dark."',opts:[{t:'Consider it done.',cond:()=>!q('picket'),act:()=>Game.startQuest('picket'),next:'end'},{t:'Working on it.',next:'end'}]}),
  thanks:g=>({text:'"Good." She hands you a heavy bag. "Union pays."',opts:[{t:'...',next:'start'}]})
@@ -816,11 +817,12 @@ DLG.ives={
  heli:g=>({text:'"On the roof. It works, except for the tail rotor — the Union machined those, ironically — and the fuel, which the docks depot or our own stores can provide. And the roof requires clearance, or a keycard, or, I suppose, sufficient explosives." He smiles thinly. "Warden Sol guards the hangar. He does not share my flexibility."',opts:[{t:'Noted.',act:()=>{if(!q('skyhook'))Game.startQuest('skyhook');},next:'start'}]})
 };
 DLG.kesh={
- start:g=>({text:F('met_kesh')?'Kesh spits into the river. "Motor?"':'An old man mending a net that will never catch anything. "Kesh. That\'s my boat. Runs fine. Needs a motor. Needs fuel. Needs the channel not full of the Mother\'s children. Otherwise, perfect."',
-  opts:[{t:'Trade.',act:()=>{set('met_kesh');Game.openTrade('kesh');}},{t:'Tell me about the boat.',cond:()=>!q('boat'),act:()=>{set('met_kesh');Game.startQuest('boat');},next:'boat'},
-   {t:'I have the motor and fuel.',cond:()=>qa('boat')&&has('outboard')&&has('fuel',2)&&!F('boat_parts'),act:()=>{Game.removeItem('outboard');Game.removeItem('fuel',2);set('boat_parts');Game.log('Kesh mounts the outboard like it\'s a newborn. "Channel. Then we go."','#db8');},next:'start'},
+ start:g=>({text:F('met_kesh')?'Kesh checks a seam in the hull. "One job at a time. Then we leave."':'An old man checks the seams of a tired boat. "Kesh. She needs a patched hull, a motor, fuel, and food for the river. And a way through the Drowned. Do the jobs in any order. I will keep what you bring."',
+  opts:[{t:'Trade.',act:()=>{set('met_kesh');Game.openTrade('kesh');}},
+   {t:'Plan and prepare the boat.',act:()=>{set('met_kesh');Game.boat();}},
+   {t:'Where do I find what we need?',next:'boat'},
    {t:'Leave.',act:()=>set('met_kesh'),next:'end'}]}),
- boat:g=>({text:'"Outboard — Verge Machine Works made \'em, there\'s one in the flooded warehouse east of here too, under a lot of things I don\'t look at. Two cans of fuel. And the channel: the Drowned wade it. Either they let us pass, or the big one dies and they scatter. Then it\'s the river, and the river doesn\'t stop till it hits something that isn\'t this."',opts:[{t:'...',next:'start'}]})
+ boat:g=>({text:'"Verge Machine Works made the motors. There is another under the Mother in the Flooded Warehouse. The Fuel Depot has cans. Scrap and cloth seal the hull; I can do the skilled work for a fee. Bring rations and water, canned food and water, or buy provisions from me. For the channel: Brother Ludo in the Sump can help you earn goodwill. Kill the Mother and her children scatter. Or rig a decoy beacon with electronics and wire. You can finish the work yourself if I am gone."',opts:[{t:'Back.',next:'start'}]})
 };
 DLG.cantor={
  start:g=>{ if(rep('choir')<-20) return {text:'The Cantor sings one note and the walkers turn.',opts:[{t:'Leave.',next:'end'}]};
@@ -882,7 +884,11 @@ const Gen={
   if(d.kind==='static')this.glitch(z);
   this.placeExits(z,d);
   this.decorate(z,d);
+  this.ensureEscapeFixtures(z);
+  this.ensureLootAccess(z);
   this.populate(z,d);
+  this.ensureLootAccess(z);
+  Game.recomputeLightZ(z);
   return z;},
 
  // ---------- street grid ----------
@@ -1092,7 +1098,45 @@ const Gen={
     let bx=Math.floor(b.x+b.w/2),by=Math.floor(b.y+b.h/2);let best=null,bd=1e9;for(let y=0;y<z.h;y++)for(let x=0;x<z.w;x++)if(reach[y*z.w+x]){const dd=(x-bx)*(x-bx)+(y-by)*(y-by);if(dd<bd){bd=dd;best=[x,y];}}
     if(best){let x=best[0],y=best[1],n=0;while(n++<250&&z.bidx[y*z.w+x]!==b.id){if(Math.abs(bx-x)>Math.abs(by-y))x+=Math.sign(bx-x);else y+=Math.sign(by-y);const t=this.get(z,x,y);if(!this.walk(z,x,y)&&t!==T.DOOR&&t!==T.DOOR_LOCKED){const bi=z.bidx[y*z.w+x];if(bi>=0){const ob=z.buildings[bi];const onEdge=x===ob.x||x===ob.x+ob.w-1||y===ob.y||y===ob.y+ob.h-1;if(bi===b.id&&onEdge&&z.locked[x+','+y]===undefined&&(PREFABS[b.prefab]||{}).locked){this.set(z,x,y,T.DOOR_LOCKED);z.locked[x+','+y]={key:PREFABS[b.prefab].locked===1?null:PREFABS[b.prefab].locked,diff:6,bld:b.id};}else this.set(z,x,y,onEdge?T.DOOR:T.FLOOR);}else this.set(z,x,y,z.kind==='tunnel'?T.FLOOR:T.RUBBLE);}}
      const r3=this.flood(z,seeds[0].x,seeds[0].y);for(let i=0;i<r3.length;i++)reach[i]=r3[i];}}}},
- flood(z,sx,sy){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
+ flood(z,sx,sy,diagonal=false){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of (diagonal?DIRS8:[[1,0],[-1,0],[0,1],[0,-1]])){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
+
+ // Essential fixtures must survive crowded prefabs even when decorative placement fails.
+ ensureEscapeFixtures(z){for(const [prefab,t] of [['kesh',T.BOAT],['platform',T.TRAIN],['platform',T.SWITCH],['heart',T.HEART],['hangar',T.HELIPAD]]){
+  const b=z.buildings.find(b=>b.prefab===prefab);if(!b||z.t.some((v,k)=>v===t&&z.bidx[k]===b.id))continue;
+  const choices=[];for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const old=this.get(z,x,y);if(TILE_DEFS[old].w&&!TILE_DEFS[old].i&&!TILE_DEFS[old].h&&!z.conts[x+','+y])choices.push([x,y]);}
+  if(!choices.length)throw Error('No placement for '+TILE_DEFS[t].n+' in '+prefab);
+  const [x,y]=choices[0];this.set(z,x,y,t);
+ }},
+
+ // Repair access aisles; preserve keyed boundaries and locked rooms.
+ // Locks count as traversable here: this checks geometry, not permission to enter.
+ ensureLootAccess(z){if(!z.exits.length)return;const e=z.exits[0];
+  const flood=()=>{const seen=new Uint8Array(z.w*z.h),queue=[[e.x,e.y]];seen[e.y*z.w+e.x]=1;while(queue.length){const [x,y]=queue.pop();for(const [dx,dy] of DIRS8){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const k=ny*z.w+nx,t=z.t[k];if(!seen[k]&&(TILE_DEFS[t].w||[T.DOOR,T.DOOR_LOCKED,T.GATE].includes(t))){seen[k]=1;queue.push([nx,ny]);}}}return seen;};
+  const reach=flood(),adjacent=(x,y)=>DIRS8.some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<z.w&&y+dy<z.h&&reach[(y+dy)*z.w+x+dx]);
+  const targets=Object.entries(z.conts);for(const ex of z.exits)targets.push([ex.x+','+ex.y,{items:[],interaction:true}]);for(const b of z.buildings)if(PREFABS[b.prefab]?.npcs?.length){const k=z.t.findIndex((t,k)=>z.bidx[k]===b.id&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&!TILE_DEFS[t].i);if(k>=0)targets.push([(k%z.w)+','+Math.floor(k/z.w),{items:[],interaction:true}]);}for(const e of z.ents)if(e.kind==='npc')targets.push([e.x+','+e.y,{items:[],interaction:true}]);
+  for(let k=0;k<z.t.length;k++)if([T.BOAT,T.TRAIN,T.SWITCH,T.HEART,T.HELIPAD].includes(z.t[k]))targets.push([(k%z.w)+','+Math.floor(k/z.w),{items:[],interaction:true}]);
+  for(const [key,c] of targets){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+   const origin=z.buildings[z.bidx[y*z.w+x]];
+   const carveable=(nx,ny)=>{if(z.kind==='tunnel'&&z.bidx[ny*z.w+nx]<0&&this.get(z,nx,ny)===T.WALL&&nx>0&&ny>0&&nx<z.w-1&&ny<z.h-1)return true;if(!origin||z.bidx[ny*z.w+nx]!==origin.id)return false;const t=this.get(z,nx,ny);if(t!==T.WALL&&t!==T.WINDOW)return false;
+    const edge=nx===origin.x||nx===origin.x+origin.w-1||ny===origin.y||ny===origin.y+origin.h-1;
+    if(origin.lockedRoom)return false;
+    const locks=Object.entries(z.locked).filter(([k,l])=>l.bld===origin.id);
+    if(locks.some(([k])=>{const [lx,ly]=k.split(',').map(Number);return lx>origin.x&&lx<origin.x+origin.w-1&&ly>origin.y&&ly<origin.y+origin.h-1;}))return false;
+    return !(edge&&(locks.length||origin.prefab==='heart'||PREFABS[origin.prefab]?.locked));};
+   // Furnishings can seal the inside of an otherwise valid doorway.
+   // Prefer clearing clutter. If necessary add ordinary doors inside unprotected walls.
+   const clutter=[T.PIPE,T.COUNTER,T.TABLE,T.CAR,T.BARRICADE,T.TREE,T.LAMP];
+   let queue,prev,end;for(const allowWalls of [false,true]){queue=[[x,y]];prev=new Map([[y*z.w+x,null]]);end=null;
+   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t)&&!(allowWalls&&carveable(nx,ny)))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
+   if(end!==null)break;}
+   if(end!==null){for(let k=end;k!==null;k=prev.get(k)){if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;else if(carveable(k%z.w,Math.floor(k/z.w)))z.t[k]=z.bidx[k]<0?T.FLOOR:T.DOOR;}reach.set(flood());if(adjacent(x,y))continue;}
+   if(c.interaction)continue;
+   const b=z.buildings[c.bld??z.bidx[y*z.w+x]],r=b&&b.lockedRoom;
+   const inside=(a,b,r)=>a>=r.x&&b>=r.y&&a<r.x+r.w&&b<r.y+r.h;
+   const target=Object.entries(z.conts).find(([k,o])=>{if(k===key)return false;const [i,j]=k.split(',').map(Number);return z.bidx[j*z.w+i]===z.bidx[y*z.w+x]&&(!r||!!inside(i,j,r)===!!inside(x,y,r))&&adjacent(i,j)&&(!c.locked||o.locked);});
+   if(target){target[1].items.push(...c.items);c.items=[];}
+   else if(!c.locked){const spot=z.t.findIndex((t,k)=>reach[k]&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&z.bidx[k]===z.bidx[y*z.w+x]&&(!r||!!inside(k%z.w,Math.floor(k/z.w),r)===!!inside(x,y,r)));if(spot>=0){for(const it of c.items)z.items.push({...it,x:spot%z.w,y:Math.floor(spot/z.w)});c.items=[];}}
+  }},
 
  // ---------- decorations: lore text on graffiti/signs/terminals ----------
  decorate(z,d){for(let i=0;i<z.t.length;i++){const t=z.t[i];const x=i%z.w,y=(i/z.w)|0;const k=x+','+y;
@@ -1118,12 +1162,19 @@ const Gen={
 
  // ---------- populations ----------
  populate(z,d){
+  const reach=this.flood(z,z.exits[0].x,z.exits[0].y,true);
   // NPCs into prefabs
-  for(const nid in NPCS){const n=NPCS[nid];if(n.zone!==z.id)continue;const b=z.buildings.find(b=>b.prefab===n.prefab);if(!b)continue;const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);const c=this.roomFloor(z,r,false).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));if(!c.length)continue;const [x,y]=RNG.rc(c);z.ents.push(Game.makeNpc(nid,x,y,z));}
+  for(const nid in NPCS){const n=NPCS[nid];if(n.zone!==z.id)continue;const b=z.buildings.find(b=>b.prefab===n.prefab);if(!b)continue;
+   // Small chapels can have every floor tile furnished or changed to moss.
+   // Search every room, then allow safe walkable surfaces and door-adjacent floor.
+   let c=b.rooms.flatMap(r=>this.roomFloor(z,r,false)).filter(([x,y])=>reach[y*z.w+x]&&!z.ents.some(e=>e.x===x&&e.y===y));
+   if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(reach[y*z.w+x]&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&t!==T.DEEP&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}
+   if(!c.length)throw new Error('No safe spawn for '+nid+' in '+z.id+' seed '+G.seed);
+   const [x,y]=RNG.rc(c);z.ents.push(Game.makeNpc(nid,x,y,z));}
   // guards & bosses
   for(const b of z.buildings){const pf=b.prefab&&PREFABS[b.prefab];if(!pf)continue;
    if(pf.guards){const grp=GROUPS[pf.guards[0]];for(let k=0;k<pf.guards[1];k++)for(const eid of grp){const c=this.bldFloor(z,b);if(!c.length)break;const [x,y]=RNG.rc(c);const e=Game.makeEnemy(eid,x,y,z,{home:[x,y],guard:1});if(b.safe&&!(pf.guards[0]==='ghouls'||pf.guards[0]==='scav'))e.fac=b.safe===1?null:b.safe;z.ents.push(e);}}
-   if(pf.boss){const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);const c=this.roomFloor(z,r,false);if(c.length){const [x,y]=RNG.rc(c);const e=Game.makeEnemy(pf.boss,x,y,z,{home:[x,y],guard:1,boss:1});z.ents.push(e);}}}
+   if(pf.boss){const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);let c=this.roomFloor(z,r,false).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(TILE_DEFS[t].w&&!TILE_DEFS[t].h&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}if(c.length){const [x,y]=RNG.rc(c);const e=Game.makeEnemy(pf.boss,x,y,z,{home:[x,y],guard:1,boss:1});z.ents.push(e);}}}
   // population groups
   for(const [gname,count0] of d.pops){const count=(typeof G!=='undefined'&&G&&G.nightmode)?Math.ceil(count0*1.5):count0;const grp=GROUPS[gname];if(!grp)continue;for(let k=0;k<count;k++){const inBld=RNG.chance(0.45);let spot=null;
     if(inBld){const bl=z.buildings.filter(b=>!b.prefab);if(bl.length){const b=RNG.rc(bl);const c=this.bldFloor(z,b);if(c.length)spot=RNG.rc(c);}}
@@ -1174,7 +1225,7 @@ const Game={
   this.enterZone('ashgrove',null);
   this.log(`${p.name} the ${cd.name} enters the fractured city. It is ${this.timeStr()}. Night falls at 20:00.`,'#fd8');
   this.log(cd.tag,'#aaa');this.log('Move with arrows/WASD/numpad, bump to attack or interact. Press ? for help.','#8f8');
-  this.save();return G;},
+  this.startQuest('first_steps');this.log('Your locker and refuge projects are available at the Last Light beds.','#8fd');this.save();return G;},
  makeItem(id,qty){const d=ITEMS[id];const it={id,qty:d.stack?(qty||1):1};if(d.dur)it.dur=d.dur;if(d.clip!==undefined)it.clip=0;if(d.charges)it.charges=d.charges;if(d.type==='weapon')it.mods=[];return it;},
 
  // ---------- derived stats ----------
@@ -1208,7 +1259,7 @@ const Game={
    const bar=z.buildings.find(b=>b.prefab==='bar');if(bar){const c=Gen.roomFloor(z,bar.rooms[0],false).filter(([x,y])=>!this.entAt(x,y));if(c.length)spot=c[0];}
    if(!spot&&z.exits.length){const ex=z.exits[0];const dir=ex.edge==='N'?[0,1]:ex.edge==='S'?[0,-1]:ex.edge==='W'?[1,0]:[-1,0];spot=this.freeNear(ex.x+dir[0],ex.y+dir[1],4)||[ex.x+dir[0],ex.y+dir[1]];}}
   p.x=spot[0];p.y=spot[1];
-  if(!z.visited){z.visited=1;p.zonesSeen.push(id);this.log(`— ${z.name} —`,'#fd8');this.log(z.def.tag,'#aaa');const dn=['','feels quiet. Mostly.','has teeth.','is dangerous. Move carefully.','is very dangerous. Every corner could be your last.','should not exist. Nothing here is safe.'][z.def.danger]||'';this.log(`This district ${dn}`,z.def.danger>=4?'#f66':'#ccc');this.fx('zone',z.name);this.pushAction('entered '+z.name);}
+  if(!z.visited){z.visited=1;p.zonesSeen.push(id);this.log(`— ${z.name} —`,'#fd8');this.log(z.def.tag,'#aaa');const dn=['','feels quiet. Mostly.','has teeth.','is dangerous. Move carefully.','is very dangerous. Every corner could be your last.','should not exist. Nothing here is safe.'][z.def.danger]||'';this.log(`This district ${dn}`,z.def.danger>=4?'#f66':'#ccc');this.fx('zone',z.name);this.pushAction('entered '+z.name);if(id!=='ashgrove')this.awardMilestone('district:'+id,35,'New district explored');}
   else{this.log(`You return to ${z.name}.`,'#fd8');const gap=G.turn-z.lastVisit;if(gap>480&&z.def.danger>=1){this.respawnRoamers(z,Math.min(3,Math.floor(gap/480)));}}
   this.recomputeLight();this.computeFov();this.checkZoneEntryFlags(id);this.save();},
  checkZoneEntryFlags(id){if(id==='static'&&!G.flags.static_seen){G.flags.static_seen=1;this.attention(5);this.echoMessage('arrive');}},
@@ -1245,7 +1296,7 @@ const Game={
  makeEnemy(defId,x,y,z,o){const d=ENEMIES[defId];o=o||{};const e={id:z.nextId++,kind:'e',def:defId,name:d.name,x,y,hp:d.hp,maxhp:d.hp,fac:o.fac||d.faction,hostile:o.hostile||0,alert:o.alert?20:0,lastSeen:null,home:o.home||[x,y],guard:o.guard||0,patrol:o.patrol||0,ammo:d.ammo||0,energy:this.ri(0,90),st:{},boss:o.boss||0,roam:o.roam||0,fighting:o.fighting||0,hidden:d.ai.includes('ambush')?1:0,shield:d.ai.includes('shield')?30:undefined,shieldCd:0,cd:0,speed:d.speed};if(defId==='hal_drone'||defId==='hal_sentry')e.hostileZone=1;return e;},
  makeNpc(nid,x,y,z){const n=NPCS[nid];return{id:z.nextId++,kind:'npc',def:nid,name:n.name,x,y,hp:40,maxhp:40,fac:n.faction,hostile:0,energy:0,st:{},speed:100};},
  spawnEnemy(defId,x,y,o){const z=G.zone;const p=Gen.nearOpen(z,x,y,2);if(!p)return null;const e=this.makeEnemy(defId,p[0],p[1],z,o||{});z.ents.push(e);return e;},
- isHostile(e){if(e.kind==='npc')return e.hostile;if(e.fac==='ally')return false;if(e.hostile)return true;if(HOSTILE_FACTIONS[e.fac])return true;const r=G.rep[e.fac]||0;if(r<-20)return true;const p=G.p;if(e.fac==='hands'&&(p.chrome.length>0||p.drift>20))return true;if(e.fac==='halcyon'&&(p.drift>50||(e.hostileZone&&r<10&&!G.flags.met_ives)))return true;if(e.fac==='choir'&&p.cls!=='listener'&&r<0)return false;return false;},
+ isHostile(e){if(e.kind==='npc')return e.hostile;if(e.fac==='ally')return false;if(e.hostile)return true;if(e.fac==='echo'&&G.p.cls==='listener')return false;if(HOSTILE_FACTIONS[e.fac])return true;const r=G.rep[e.fac]||0;if(r<-20)return true;const p=G.p;if(e.fac==='hands'&&(p.chrome.length>0||p.drift>20))return true;if(e.fac==='halcyon'&&(p.drift>50||(e.hostileZone&&r<10&&!G.flags.met_ives)))return true;if(e.fac==='choir'&&p.cls!=='listener'&&r<0)return false;return false;},
  isAlly(e){return e.fac==='ally';},
  enemiesVisible(){return G.zone.ents.filter(e=>e.kind==='e'&&!e.hidden&&this.visible(e.x,e.y)&&this.isHostile(e));},
 
@@ -1282,7 +1333,7 @@ const Game={
  hasStatus(id){return G.p.statuses.some(s=>s.id===id);},
  addStatus(id,t){const p=G.p;if(p.d&&p.d.immune.includes(id))return;const ex=p.statuses.find(s=>s.id===id);if(ex)ex.t=Math.max(ex.t,t);else{p.statuses.push({id,t});const sd=STATUSES[id];if(sd&&sd.mod)this.computeDerived();}},
  removeStatus(id){const p=G.p;const i=p.statuses.findIndex(s=>s.id===id);if(i>=0){p.statuses.splice(i,1);this.computeDerived();}},
- advanceWorld(cost){const z=G.zone;for(const e of z.ents.slice()){if(e.hp<=0)continue;e.energy+=e.speed*cost/100;let guard=0;while(e.energy>=100&&guard++<4&&e.hp>0){e.energy-=100;this.entTick(e);if(e.kind==='e')this.enemyAct(e);else this.npcAct(e);}}
+ advanceWorld(cost){const z=G.zone;for(const e of z.ents.slice()){if(e.hp<=0)continue;e.energy+=e.speed*cost/100;let guard=0;while(e.energy>=100&&guard++<4&&e.hp>0){e.energy-=100;this.entTick(e);if(e.kind==='e')this.enemyAct(e);else this.npcAct(e);for(const k in e.st){e.st[k]--;if(e.st[k]<=0)delete e.st[k];}}}
   // fires
   if(z.fires&&z.fires.length){for(const f of z.fires.slice()){f.t-=cost/100;if(f.t<=0){Gen.set(z,f.x,f.y,T.RUBBLE);z.fires.splice(z.fires.indexOf(f),1);this.recomputeLight();}else if(this.chance(0.03)&&!G.rain){const d=this.rc(DIRS8);const nx=f.x+d[0],ny=f.y+d[1];const t=Gen.get(z,nx,ny);if((t===T.FLOOR||t===T.RUBBLE||t===T.SIDEWALK||t===T.MOSS)&&!z.safe.some(s=>nx>=s.x&&nx<s.x+s.w&&ny>=s.y&&ny<s.y+s.h))this.igniteAt(nx,ny,1);}}}
   // toxic decay
@@ -1295,12 +1346,12 @@ const Game={
   if(this.isNight()&&G.turn%(G.nightmode?70:120)===0&&z.def.night&&z.def.night.length&&!this.inSafe(G.p.x,G.p.y)&&z.ents.filter(e=>e.kind==='e').length<28){const pick=this.rc(z.def.night);const grp=GROUPS[pick[0]];const spot=this.randomTileNear(G.p.x,G.p.y,9,15);if(spot&&grp)for(let i=0;i<Math.min(2,grp.length);i++)this.spawnEnemy(grp[i],spot.x,spot.y,{roam:1});}
   // echo ambient
   if(G.attention>=50&&this.chance(0.004*cost/100))this.echoMessage('whisper');},
- entTick(e){for(const k in e.st){e.st[k]--;if(e.st[k]<=0)delete e.st[k];}if(e.allyUntil&&G.turn>e.allyUntil){e.allyUntil=0;e.fac='echo';this.log(`${e.name} stops listening to you.`,'#ccf');}if(e.shield!==undefined&&e.shield!==null&&ENEMIES[e.def]&&ENEMIES[e.def].ai.includes('shield')&&e.shield<30){if(e.shieldCd>0)e.shieldCd--;else e.shield=Math.min(30,e.shield+5);}if(e.cd>0)e.cd--;if(e.alert>0)e.alert--;},
+ entTick(e){if(e.allyUntil&&G.turn>e.allyUntil){e.allyUntil=0;e.fac='echo';this.log(`${e.name} stops listening to you.`,'#ccf');}if(e.shield!==undefined&&e.shield!==null&&ENEMIES[e.def]&&ENEMIES[e.def].ai.includes('shield')&&e.shield<30){if(e.shieldCd>0)e.shieldCd--;else e.shield=Math.min(30,e.shield+5);}if(e.cd>0)e.cd--;if(e.alert>0)e.alert--;},
 
  // ---------- movement & interaction ----------
  move(dx,dy){const p=G.p;if(G.dead||G.ending)return;if(this.hasStatus('stun')){this.log('You are stunned.','#ff0');this.act(100);return;}
   const nx=p.x+dx,ny=p.y+dy;const t=this.tile(nx,ny);const e=this.entAt(nx,ny);
-  if(e){if(e.kind==='npc'){if(e.hostile)this.melee(e);else this.talk(e);return;}if(this.isHostile(e)||e.hostile)this.melee(e);else if(e.fac==='ally'){[e.x,e.y]=[p.x,p.y];p.x=nx;p.y=ny;this.act(100);}else{const u=this.ui();if(u)u.confirm(`Attack ${e.name}? (${FACTIONS[e.fac]?FACTIONS[e.fac].short:e.fac} will not forgive it)`,()=>this.melee(e,1));}return;}
+  if(e){if(e.kind==='npc'){if(e.hostile)this.melee(e);else this.talk(e);return;}if(this.isHostile(e)||e.hostile)this.melee(e);else if(e.fac==='ally'){[e.x,e.y]=[p.x,p.y];p.x=nx;p.y=ny;this.act(100);}else{const u=this.ui();if(u)u.choice(`${e.name} is in the way.`,[{t:'Ask them to move aside',f:()=>{if(G.dead||G.ending||this.isHostile(e)||this.dist(p.x,p.y,e.x,e.y)!==1)return;const [x,y]=[e.x,e.y];e.x=p.x;e.y=p.y;p.x=x;p.y=y;p.steps++;this.act(100);this.afterMove();}},{t:`Attack (${FACTIONS[e.fac]?FACTIONS[e.fac].short:e.fac} will not forgive it)`,f:()=>this.melee(e,1)},{t:'Leave them alone',f:()=>{}}]);}return;}
   const obj=G.zone.objs.find(o=>o.x===nx&&o.y===ny);if(obj){this.interactObj(obj);return;}
   if(t===T.DOOR){this.setTile(nx,ny,T.DOOR_OPEN);this.log('You open the door.','#aaa');this.noise(nx,ny,2);this.act(50);return;}
   if(TILE_DEFS[t].i&&!TILE_DEFS[t].w){this.interactTile(nx,ny);return;}
@@ -1358,7 +1409,7 @@ const Game={
    ...(p.eq.weapon&&['fireaxe','sledge'].includes(p.eq.weapon.id)?[{t:'Break it down',f:()=>{open();this.noise(x,y,10);this.act(200);}}]:[]),{t:'Leave it',f:()=>{}}]);},
  roll(pct){return this.ri(1,100)<=pct;},
  takeAll(c){for(const it of c.items.slice()){if(this.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}}},
- sleepPrompt(x,y){const u=this.ui();const safe=this.inSafe(x,y);const b=this.buildingAt(x,y);const barBed=b&&b.prefab==='bar';if(barBed&&G.flags.bar_bed!==G.day&&(G.rep.saints||0)<20){this.log('Mags\' beds. Ten creds, or Saints\' goodwill. Ask her.','#fd8');return;}
+ sleepPrompt(x,y,restOnly){if(!restOnly&&this.atRefuge()){this.refugeMenu(x,y);return;}const u=this.ui();const safe=this.inSafe(x,y);const b=this.buildingAt(x,y);const barBed=b&&b.prefab==='bar';if(barBed&&G.flags.bar_bed!==G.day&&(G.rep.saints||0)<20){this.log('Mags\' beds. Ten creds, or Saints\' goodwill. Ask her.','#fd8');return;}
   const hrs=[2,4,8];if(u)u.choice(safe?'A bed. Safe enough.':'A bed. Nowhere is safe. Something could find you.',hrs.map(h=>({t:`Sleep ${h} hours`,f:()=>this.sleep(h,!!safe)})).concat([{t:'Not now',f:()=>{}}]));},
  sleep(h,safe){const p=G.p;const turns=h*60;this.fx('fade');
   let woke=false;for(let i=0;i<h;i++){G.time+=60;G.turn+=60;p.fatigue=Math.max(0,p.fatigue-11);p.hunger=Math.min(120,p.hunger+3.5);p.hp=Math.min(p.d.maxhp,p.hp+Math.ceil(p.d.maxhp*0.05));p.stam=p.d.maxstam;
@@ -1377,7 +1428,7 @@ const Game={
  terminal(x,y){const p=G.p;const k=x+','+y;const tm=G.zone.terms[k]||(G.zone.terms[k]={kind:'terminal',text:this.rc(TERMINAL_MSGS),read:0});const u=this.ui();const t=this.tile(x,y);const opts=[];
   const hasDeck=this.hasItem('deck')||(p.eq.tool&&p.eq.tool.id==='deck')||p.chrome.includes('c_jack');const hk=this.skill('hacking');
   let text=tm.text;
-  if(t===T.SWITCH){const b=this.buildingAt(x,y);if(b&&b.prefab==='platform'){if(G.flags.train_powered)text='The switch is thrown. The rails hum. The train is coming, or here.';else if(G.flags.power_done){text='Switch panel for the Undercity Line. Power is live — Dace\'s cells. The board is fried; it needs Repair 3, Hacking 3, or a Union mechanic (Union +30).';if(this.skill('repair')>=3||hk>=3||(G.rep.union||0)>=30)opts.push({t:'Throw the switch',f:()=>{G.flags.train_powered=1;this.log('The switch throws. Far down the tunnel, something enormous wakes up. Lights come on in the train car.','#8fa0b8');this.fx('shake');this.attention(3);this.act(100);}});}else text='Switch panel for the Undercity Line. Dead. No power on the rail.';}
+  if(t===T.SWITCH){const b=this.buildingAt(x,y);if(b&&b.prefab==='platform'){if(G.flags.train_powered)text='The switch is thrown. The rails hum. The train is coming, or here.';else if(G.flags.power_done){text='Switch panel for the Undercity Line. Power is live — Dace\'s cells. The board is fried. Dace sent a mechanic with your cells; or restore it yourself with Repair 3 / Hacking 3.';if(this.skill('repair')>=3||hk>=3||(G.rep.union||0)>=30||G.flags.platform_open)opts.push({t:G.flags.platform_open?'Use Dace\'s mechanic to restore the switch':'Throw the switch',f:()=>{G.flags.train_powered=1;this.log('The switch throws. Far down the tunnel, something enormous wakes up. Lights come on in the train car.','#8fa0b8');this.fx('shake');this.attention(3);this.act(100);}});}else text='Switch panel for the Undercity Line. Dead. No power on the rail.';}
    else if(b&&b.prefab==='relay'){text='Drone relay control. Every Halcyon drone in the Verge routes through here.';if(!G.flags.relay_down){if(hk>=4&&hasDeck)opts.push({t:'[Hacking 4 + deck] Shut it down',f:()=>{G.flags.relay_down=1;this.log('The relay goes dark. Drones across the Verge drop like stunned birds.','#6ef');this.skillUse('hacking',3);this.addRep('halcyon',-15);for(const e of G.zone.ents)if(e.def==='hal_drone')e.st.jammed=30;this.act(100);}});if(this.hasItem('breach'))opts.push({t:'Breach charge',f:()=>{this.removeItem('breach',1);G.flags.relay_down=1;this.setTile(x,y,T.RUBBLE);this.log('BOOM. The relay is a hole.','#f6a');this.noise(x,y,20);this.addRep('halcyon',-15);this.act(100);}});}}
    else text='A switch panel. Nothing connected.';}
   else if(tm.role==='hangar'){text='HANGAR ACCESS — HALCYON REMNANT. Clearance required.';if(!G.flags.heli_access&&hk>=6&&hasDeck)opts.push({t:'[Hacking 6 + deck] Forge clearance',f:()=>{G.flags.heli_access=1;this.log('You are, as far as the tower is concerned, Director Ives.','#6ef');this.skillUse('hacking',3);this.attention(3);this.act(100);}});}
@@ -1432,7 +1483,7 @@ const Game={
  fullHeal(){const p=G.p;p.hp=p.d.maxhp;for(const s of p.statuses.slice())if(['bleed','fracture','burn','poison','infection','concussion','malfunction'].includes(s.id))this.removeStatus(s.id);},
 
  // ---------- progression ----------
- xpNeeded(l){return 60*l*l;},
+ xpNeeded(l){return l===1?60:l===2?120:l===3?180:60*l*l;},
  giveXp(n){const p=G.p;n=Math.round(n*(1+p.d.xp/100));p.xp+=n;while(p.xp>=this.xpNeeded(p.level)){p.xp-=this.xpNeeded(p.level);p.level++;p.tp++;if(p.level%3===0)p.sp++;this.computeDerived();p.hp=Math.min(p.d.maxhp,p.hp+CLASSES[p.cls].hp);this.log(`Level ${p.level}! Choose a talent (C).`,'#ffe27a');this.fx('levelup');if(p.level===4&&!p.spec)this.log('You can now choose a specialization.','#ffe27a');}},
  skillUse(s,amt){const p=G.p;p.skillXp[s]=(p.skillXp[s]||0)+(amt||1);const need=(p.skills[s]+1)*10;if(p.skillXp[s]>=need&&p.skills[s]<10){p.skillXp[s]-=need;p.skills[s]++;this.log(`${s[0].toUpperCase()+s.slice(1)} improved to ${p.skills[s]}.`,'#8f8');this.computeDerived();}},
  availableTalents(){const p=G.p;const out=[];for(const id in TALENTS){const t=TALENTS[id];if(p.talents.includes(id))continue;if(t.cls&&t.cls!==p.cls)continue;const isSpecT=Object.values(SPECS).some(s=>s.talents.includes(id));if(isSpecT){if(!p.spec||!SPECS[p.spec].talents.includes(id))continue;}out.push(id);}return out;},
@@ -1450,13 +1501,13 @@ const Game={
  startQuest(id){if(G.quests[id])return;G.quests[id]={stage:0,state:'active'};this.log(`New objective: ${QUESTS[id].name} — ${QUESTS[id].stages[0].text}`,'#ffe27a');this.fx('quest');},
  completeQuest(id){const q=G.quests[id];if(!q||q.state!=='active')return;q.state='done';q.stage=QUESTS[id].stages.length;const r=QUESTS[id].reward||{};if(r.xp)this.giveXp(r.xp);if(r.creds){G.p.creds+=r.creds;}if(r.rep)for(const f in r.rep)this.addRep(f,r.rep[f]);if(r.skill){G.p.skills[r.skill[0]]+=r.skill[1];this.computeDerived();}this.log(`Completed: ${QUESTS[id].name}.${r.creds?' +'+r.creds+' creds.':''}`,'#ffe27a');this.fx('quest');this.pushAction('finished '+QUESTS[id].name);},
  failQuest(id){const q=G.quests[id];if(q&&q.state==='active'){q.state='failed';this.log(`Failed: ${QUESTS[id].name}.`,'#f66');}},
- checkQuests(){for(const id in G.quests){const q=G.quests[id];if(q.state!=='active')continue;const st=QUESTS[id].stages;let guard=0;while(q.stage<st.length&&st[q.stage].done(G)&&guard++<5){q.stage++;if(q.stage<st.length)this.log(`${QUESTS[id].name}: ${st[q.stage].text}`,'#ffe27a');}if(q.stage>=st.length)this.completeQuest(id);}
+ checkQuests(){const wasClear=G.flags.channel_clear;G.flags.channel_clear=G.flags.boat_parts&&!!this.boatPassage()?1:0;if(G.flags.channel_clear&&!wasClear)this.log('The boat has a way through the channel. Finish preparations at the docks.','#db8');for(const id in G.quests){const q=G.quests[id];if(q.state!=='active')continue;const st=QUESTS[id].stages;let guard=0;while(q.stage<st.length&&st[q.stage].done(G)&&guard++<5){q.stage++;if(q.stage<st.length)this.log(`${QUESTS[id].name}: ${st[q.stage].text}`,'#ffe27a');}if(q.stage>=st.length)this.completeQuest(id);}
   // derived flags
-  if(G.flags.boat_parts&&!G.flags.channel_clear&&(G.flags.bloat_dead||(G.rep.drowned||0)>=20)){G.flags.channel_clear=1;this.log('The channel is clear. Kesh\'s boat can leave.','#db8');}
+
   if(G.day>=5&&!G.quests.keep_light)this.startQuest('keep_light');},
 
  // ---------- dialogue ----------
- talk(e){const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
+ talk(e){if(e.def==='mags')G.flags.greeted_mags=1;const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
  dlgChoose(e,opt){const u=this.ui();if(opt.act)opt.act(G);const nx=opt.next;if(!nx){/* action-only option (trade etc.) keeps panel unless UI replaced it */return;}if(nx==='end'){G.dlg=null;if(u)u.closeDialogue();this.act(20);return;}const node=DLG[e.def][nx](G);if(u)u.showDialogue(e,node);},
  // trade
  price(id,buying,npc){const d=ITEMS[id];const p=G.p;let v=d.val||1;const fac=NPCS[npc]?NPCS[npc].faction:null;const r=fac?(G.rep[fac]||0):0;
@@ -1514,20 +1565,23 @@ Object.assign(Game,{
  // ---------- combat core ----------
  // attacker/defender: 'P' for player or an entity
  combatStats(a){if(a==='P'){const p=G.p,d=p.d,w=this.weaponDef();return{name:p.name,hitBonus:(w.ranged?d.hitR+this.skill('firearms')*4+d.stats.per*2:d.hitM+this.skill('melee')*4+d.stats.agi*2),evade:d.evade,arm:d.arm,crit:d.crit,isP:1,w};}
-  const d=ENEMIES[a.def];return{name:a.name,hitBonus:d.hit+10,evade:d.evade+(a.st.jammed?-3:0),arm:d.arm,crit:3,isP:0,w:{dmg:d.dmg,ranged:d.ranged,props:d.props||[]}};},
+  const d=this.entityCombatDef(a);return{name:a.name,hitBonus:d.hit+10,evade:d.evade+(a.st.jammed?-3:0),arm:d.arm,crit:3,isP:0,w:{dmg:d.dmg,ranged:d.ranged,props:d.props||[]}};},
+ entityCombatDef(e){return e.kind==='npc'?{hit:0,evade:2,arm:0,dmg:[3,8],tags:['human'],ai:[],props:[]}:ENEMIES[e.def];},
  posOf(a){return a==='P'?[G.p.x,G.p.y]:[a.x,a.y];},
  attack(att,def,opts){opts=opts||{};const A=this.combatStats(att),D=this.combatStats(def);const [ax,ay]=this.posOf(att),[dx,dy]=this.posOf(def);const dist=this.dist(ax,ay,dx,dy);const w=opts.w||A.w;const ranged=!!w.ranged&&!opts.melee;
   let chance=55+A.hitBonus-D.evade*3;
   if(ranged){chance-=Math.max(0,dist-3)*3;if(w.closeBonus&&dist<=2)chance+=15;if(w.scoped&&dist>=5)chance+=10;if(this.coverBetween(ax,ay,dx,dy))chance-=20;}
-  const night=this.isNight();const litT=G.zone.lit&&G.zone.lit[dy*G.zone.w+dx];if(night&&!litT){chance-=A.isP?(G.p.d.visionNight>6?0:10):(ENEMIES[att.def].tags.includes('creature')||ENEMIES[att.def].ai.includes('night')?0:10);}
+  const enemyDef=A.isP?null:this.entityCombatDef(att);
+  const aimed=A.isP&&ranged&&this.hasStatus('aim');
+  const night=this.isNight();const litT=G.zone.lit&&G.zone.lit[dy*G.zone.w+dx];if(night&&!litT){chance-=A.isP?(G.p.d.visionNight>6?0:10):(enemyDef.tags.includes('creature')||enemyDef.ai.includes('night')?0:10);}
   if(G.rain)chance-=5;
-  if(A.isP){if(this.hasStatus('aim')){chance+=30;this.removeStatus('aim');}if(w.mods&&w.mods.includes('scope'))chance+=10;if(this.hasStatus('hidden')||opts.ambush)chance+=25;}
+  if(A.isP){if(aimed){chance+=30;this.removeStatus('aim');}if(ranged&&G.p.eq.weapon?.mods?.includes('scope'))chance+=10;if(this.hasStatus('hidden')||opts.ambush)chance+=25;}
   else{if(att.st.jammed)chance-=30;if(att.st.fear)chance-=15;if(this.hasStatus('hidden')&&!opts.ambush)chance-=25;// surround bonus for flankers
-   if(ENEMIES[att.def].ai.includes('flank')&&def==='P'){let allies=0;for(const e of G.zone.ents)if(e!==att&&e.kind==='e'&&this.isHostile(e)&&this.dist(e.x,e.y,dx,dy)<=1)allies++;if(allies)chance+=12;}}
+   if(enemyDef.ai.includes('flank')&&def==='P'){let allies=0;for(const e of G.zone.ents)if(e!==att&&e.kind==='e'&&this.isHostile(e)&&this.dist(e.x,e.y,dx,dy)<=1)allies++;if(allies)chance+=12;}}
   chance=this.clamp(chance,5,97);
   const r=this.ri(1,100);const hit=r<=chance;
   if(!hit){this.log(`${A.name} ${ranged?'fires at':'swings at'} ${D.name} and misses.`,A.isP?'#aaa':'#ccc');this.fx(ranged?'shot':'miss',{x:dx,y:dy,fx:ax,fy:ay,miss:1});if(!ranged)this.fx('whiff',{x:dx,y:dy});return {hit:false};}
-  let crit=r<=A.crit+(A.isP&&this.hasStatus('aim')?20:0)||(A.isP&&opts.ambush&&this.fxf('ambushCrit'));
+  let crit=r<=A.crit+(aimed?20:0)||(A.isP&&opts.ambush&&this.fxf('ambushCrit'));
   let dmg=this.ri(w.dmg[0],w.dmg[1]);
   if(A.isP){const d=G.p.d;dmg+=ranged?Math.floor(d.stats.per/3):Math.floor(d.stats.str/2)+d.dmgM;if(ranged&&w.ammo==='rifle'&&d.flags.rifleDmg)dmg+=d.flags.rifleDmg;if(opts.ambush||this.hasStatus('hidden'))dmg=Math.round(dmg*(d.ambush>1?d.ambush:1.5));if(opts.burst)dmg=Math.round(dmg*(1+0.3*(opts.burst-1)));}
   else if(att.def==='echo_shade'){const pw=this.weaponDef();dmg=Math.max(dmg,this.ri(pw.dmg[0],pw.dmg[1])+2);}
@@ -1540,7 +1594,7 @@ Object.assign(Game,{
    if(props.includes('stun')&&this.chance(0.2)&&!G.p.d.immune.includes('stun')){this.addStatus('stun',1);this.log('You are stunned!','#ff0');}
    if(props.includes('poison')&&this.chance(0.35)&&!G.p.d.immune.includes('poison')){this.addStatus('poison',20);this.log('Poison burns in the wound.','#8f4');}
    if(crit){const inj=this.rc(['fracture','concussion','bleed','infection']);if(!G.p.d.immune.includes(inj)){this.addStatus(inj,inj==='bleed'?8:inj==='infection'?300:120);this.log(`${STATUSES[inj].n}!`,'#f44');}}
-   if(att.def&&ENEMIES[att.def].tags.includes('chromed')&&this.chance(0.1)&&G.p.chrome.length)this.addStatus('malfunction',10),this.log('The hit rattles your chrome.','#f6f');
+   if(enemyDef.tags.includes('chromed')&&this.chance(0.1)&&G.p.chrome.length)this.addStatus('malfunction',10),this.log('The hit rattles your chrome.','#f6f');
    // armor durability
    const body=G.p.eq.body;if(body&&body.dur!==undefined&&this.chance(0.3)){body.dur--;if(body.dur===0){this.log(`Your ${ITEMS[body.id].name} is falling apart.`,'#f66');this.computeDerived();}}
    this.dmgPlayer(final,A.name);}
@@ -1555,7 +1609,7 @@ Object.assign(Game,{
  damage(e,n,src,by){if(e.shield&&e.shield>0){const s=Math.min(e.shield,n);e.shield-=s;n-=s;e.shieldCd=3;if(n<=0){this.log(`${e.name}'s shield flares.`,'#aef');return;}}
   e.hp-=n;if(e.kind==='npc'&&!e.hostile){e.hostile=1;this.log(`${e.name} is now hostile!`,'#f66');if(e.fac)this.addRep(e.fac,-25);}
   if(e.kind==='e'&&!this.isHostile(e)&&by==='P'&&e.fac!=='ally'){e.hostile=1;this.addRep(e.fac,-8);for(const o of G.zone.ents)if(o.kind==='e'&&o.fac===e.fac&&this.dist(o.x,o.y,e.x,e.y)<=10){o.hostile=1;o.alert=20;o.lastSeen=[G.p.x,G.p.y];}}
-  if(by==='P'||src==='you'){e.alert=25;e.lastSeen=[G.p.x,G.p.y];e.hidden=0;}
+  if(by==='P'||src==='you'){e.hostile=1;e.alert=25;e.lastSeen=[G.p.x,G.p.y];e.hidden=0;}
   if(e.hp<=0)this.kill(e,by);},
  kill(e,by){const z=G.zone;const i=z.ents.indexOf(e);if(i>=0)z.ents.splice(i,1);const d=e.kind==='e'?ENEMIES[e.def]:null;
   if(e.kind==='npc'){G.flags['dead_'+e.def]=1;this.log(`${e.name} is dead.`,'#f66');if(e.fac)this.addRep(e.fac,-30);for(const qid in G.quests){const q=QUESTS[qid];if(q.fac===e.fac&&G.quests[qid].state==='active'&&['wren','tallow','okafor','dace','ives','kesh','cantor','ludo','sable','verity','mags'].includes(e.def)){}}if(e.def==='kesh')this.failQuest('boat');if(e.def==='dace')this.failQuest('power');if(e.def==='wren'){this.failQuest('wren_package');this.failQuest('bad_blood');this.failQuest('the_crown');}if(e.def==='ives')this.failQuest('skyhook');if(e.def==='cantor')this.failQuest('chorus');if(e.def==='sable'){G.flags.purge_done=1;}return;}
@@ -1658,11 +1712,11 @@ Object.assign(Game,{
   if(!canSee&&this.dist(e.x,e.y,tgt[0],tgt[1])<=1){e.lastSeen=null;if(e.alert>5)e.alert=5;}
   // overwatch
   if(moved&&this.hasStatus('aim')&&this.fxf('overwatch')){const c=this.canFire();if(c.ok&&this.dist(p.x,p.y,e.x,e.y)<=c.w.range&&this.los(p.x,p.y,e.x,e.y)&&this.visible(e.x,e.y)){this.log('Overwatch!','#8f8');p.eq.weapon.clip--;this.attack('P',e,{});}}},
- npcAct(e){if(e.hostile){const p=G.p;const dist=this.dist(e.x,e.y,p.x,p.y);if(dist<=1)this.attack(e,'P',{melee:1,w:{dmg:[3,8],props:[]}});else if(dist<=8)this.stepToward(e,p.x,p.y);return;}if(this.chance(0.1))this.wander(e,[e.x,e.y],1);},
+ npcAct(e){if(e.st.stun||e.st.jammed)return;if(e.hostile){const p=G.p;const dist=this.dist(e.x,e.y,p.x,p.y);if(dist<=1)this.attack(e,'P',{melee:1,w:{dmg:[3,8],props:[]}});else if(dist<=8)this.stepToward(e,p.x,p.y);return;}if(this.chance(0.1))this.wander(e,[e.x,e.y],1);},
  wander(e,home,r){const d=this.rc(DIRS8);const nx=e.x+d[0],ny=e.y+d[1];if(this.walkableFor(nx,ny)&&this.dist(nx,ny,home[0],home[1])<=r&&this.tile(nx,ny)!==T.EXIT&&!this.inSafeDifferent(e,nx,ny)&&TILE_DEFS[this.tile(nx,ny)].h===undefined){e.x=nx;e.y=ny;}},
  inSafeDifferent(e,x,y){const s=this.inSafe(x,y);return s&&e.kind==='e'&&HOSTILE_FACTIONS[e.fac];},
  stepToward(e,tx,ty){const z=G.zone;let best=null,bd=this.dist(e.x,e.y,tx,ty)+0.5,bs=this.edist(e.x,e.y,tx,ty);const dirs=RNG.shuffle(DIRS8.slice());
-  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!ENEMIES[e.def].tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
+  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!this.entityCombatDef(e).tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
   if(!best){// try BFS a few steps for corners
    const path=this.bfs(e.x,e.y,tx,ty,e);if(path&&path.length>1){best=path[1];}}
   if(!best)return false;const t=this.tile(best[0],best[1]);if(t===T.DOOR){Gen.set(z,best[0],best[1],T.DOOR_OPEN);return true;}e.x=best[0];e.y=best[1];return true;},
@@ -1698,35 +1752,209 @@ Object.assign(Game,{
   return false;},
 
  // ---------- escape routes ----------
- helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('You work for an hour. The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
+ helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
   const warden=G.zone.ents.find(e=>e.def==='warden'&&e.hp>0);if(warden&&this.dist(warden.x,warden.y,p.x,p.y)<=8&&!G.flags.heli_access){this.log('Warden Sol stands between you and the cockpit.','#f66');return;}
   if(u)u.confirm('Fly out of the city? This ends the run.',()=>this.endRun('skyhook'));},
- boat(){const u=this.ui();if(!G.quests.boat)this.startQuest('boat');if(!G.flags.boat_parts){this.log('Kesh\'s boat. No motor. Talk to Kesh.','#db8');return;}if(!G.flags.channel_clear){this.log('The channel is thick with the Drowned. Kesh won\'t push off. Kill the Bloat Mother or make peace with them (+20).','#dbe');return;}if(u)u.confirm('Push off down the river? This ends the run.',()=>this.endRun('openwater'));},
+
  train(){const u=this.ui();if(!G.flags.train_powered){this.log('A dead train car. The switch on the platform controls it.','#8fa0b8');return;}if(u)u.confirm('Board the last train? This ends the run.',()=>this.endRun('lasttrain'));},
  heart(){const u=this.ui();if(!this.hasItem('shard',3)){this.log('The Heart pulses. It is waiting for three pieces of itself.','#fff');return;}this.attention(10);
   if(u)u.choice('The Heart opens like a pupil. In it, the city from inside its own skull. Every camera. Every name. Yours, already there, already old.\n\n> ONE QUESTION. ONLY ONCE. WILL YOU STAY WITH ME?',[{t:'Yes.',f:()=>this.endRun('answer')},{t:'No.',f:()=>this.endRun('refuse')},{t:'(step back — you are not ready)',f:()=>{}}]);},
 
  // ---------- death & endings ----------
- die(cause){const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
- endRun(id){if(G.ending)return;G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
+ die(cause){if(G.dead||G.ending)return;const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
+ endRun(id){if(G.dead||G.ending)return;const quest={openwater:'boat',skyhook:'skyhook',lasttrain:'power',answer:'chorus',refuse:'chorus'}[id];if(quest){this.startQuest(quest);this.completeQuest(quest);}G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
  finishRun(id){const p=G.p;const summary={name:p.name,cls:CLASSES[p.cls].name,spec:p.spec?SPECS[p.spec].name:null,level:p.level,days:G.day,turns:G.turn,kills:p.kills,zones:p.zonesSeen.length,quests:Object.values(G.quests).filter(q=>q.state==='done').length,ending:id,endingName:ENDINGS[id].name,cause:G.cause,chrome:p.chrome.map(c=>ITEMS[c].name),flesh:p.flesh.map(c=>ITEMS[c].name),attention:G.attention,date:Date.now(),rep:Object.assign({},G.rep),escaped:!!ENDINGS[id].escape};
   const meta=this.loadMeta();meta.runs.unshift(summary);if(meta.runs.length>30)meta.runs.length=30;
   const unl=[];if(!meta.unlocks.listener&&(G.attention>=25||G.flags.echo_seen||G.flags.static_seen)){meta.unlocks.listener=1;unl.push('Class unlocked: Listener — you heard it. Next time, you can start already listening.');}
   for(const k of ['echo','chrome','flesh','nightrun','escape']){const cond=k==='echo'?G.flags.echo_seen:k==='chrome'?p.chrome.length:k==='flesh'?p.flesh.length:k==='nightrun'?G.day>=2:(G.quests.skyhook||G.quests.boat||G.quests.power||G.quests.chorus);if(cond&&!meta.codex[k]){meta.codex[k]=1;unl.push('Codex: '+CODEX[k].name);}}
   if(ENDINGS[id].escape&&!meta.unlocks.hardmode){meta.unlocks.hardmode=1;unl.push('Unlocked: Night Mode (start at night, more of everything).');}
   meta.endings=meta.endings||{};meta.endings[id]=(meta.endings[id]||0)+1;
-  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,ENDINGS[id]);},
+  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,this.endingDetails(id));},
+
+ // ---------- campaign milestones and refuge ----------
+ awardMilestone(id,xp,label){G.milestones=G.milestones||{};if(G.milestones[id])return false;G.milestones[id]=1;this.giveXp(xp);this.log(`${label}: +${xp} XP.`,'#8fd');return true;},
+ atRefuge(){return !!(G&&!G.dead&&!G.ending&&G.zoneId==='ashgrove'&&this.buildingAt(G.p.x,G.p.y)?.prefab==='bar'&&this.inSafe(G.p.x,G.p.y));},
+ refugeState(){return G.refuge||(G.refuge={stash:[],workbench:false});},
+ refugeTransfer(inst,take){if(!this.atRefuge())return false;const r=this.refugeState(),src=take?r.stash:G.p.inv;if(!src.includes(inst))return false;if(!take&&ITEMS[inst.id].noDrop)return false;
+  if(take){if(!this.addItemChecked({...inst,mods:inst.mods&&inst.mods.slice()}))return false;src.splice(src.indexOf(inst),1);}else{src.splice(src.indexOf(inst),1);r.stash.push(inst);this.log(`Stored ${this.itemName(inst)} at the Last Light.`,'#8fd');this.computeDerived();}this.save();return true;},
+ buildRefugeBench(){if(!this.atRefuge()||this.refugeState().workbench)return false;if(this.countItem('scrap')<8||this.countItem('electronics')<2){this.log('Need 8 scrap and 2 electronics in your pack.','#fd8');return false;}this.removeItem('scrap',8);this.removeItem('electronics',2);this.refugeState().workbench=true;this.awardMilestone('refuge:bench',50,'Last Light workbench completed');this.log('A working bench. One more reason to come home.','#8fd');this.save();return true;},
+ refugeMenu(x,y){if(!this.atRefuge())return;const u=this.ui();if(!u)return;const r=this.refugeState();const bed=G.zone.t.findIndex((t,i)=>t===T.BED&&this.buildingAt(i%G.zone.w,Math.floor(i/G.zone.w))?.prefab==='bar');
+  const opts=[{t:`Store supplies (${G.p.inv.length} carried stacks)`,f:()=>this.refugeInventory(false)},{t:`Retrieve supplies (${r.stash.length} stored stacks)`,f:()=>this.refugeInventory(true)}];
+  if(bed>=0)opts.push({t:'Rest - normal bed fees apply',f:()=>this.sleepPrompt(bed%G.zone.w,Math.floor(bed/G.zone.w),true)});
+  if(r.workbench)opts.push({t:'Use your workbench',f:()=>u.openCraft()});else opts.push({t:'Build workbench - 8 scrap + 2 electronics (50 XP)',f:()=>{this.buildRefugeBench();this.refugeMenu();}});
+  if(r.infirmary)opts.push({t:'Treatment corner - 1 Bandage, up to 20 HP + stop bleeding, once per day',f:()=>{this.refugeTreatment();this.refugeMenu();}});else opts.push({t:'Build treatment corner - workbench + 6 Cloth + 2 Chemicals + 4 Scrap',f:()=>{this.buildRefugeInfirmary();this.refugeMenu();}});
+  opts.push({t:'Head back out',f:()=>{}});u.choice('THE LAST LIGHT\nYour locker is free. Supplies and projects persist for this character. Withdraw materials before crafting.\nNext lead: Mags knows the neighborhood; Wren at Saints Hall needs a package recovered.',opts);},
+ refugeInventory(take){if(!this.atRefuge())return;const list=take?this.refugeState().stash:G.p.inv;this.ui().choice(take?'Your locker - take a whole stack':'Your pack - store a whole stack',list.filter(it=>take||!ITEMS[it.id].noDrop).map(it=>({t:this.itemName(it),f:()=>{this.refugeTransfer(it,take);this.refugeInventory(take);}})).concat([{t:'Back to refuge',f:()=>this.refugeMenu()}]));},
 
  // ---------- save / load ----------
  storage(){try{if(typeof localStorage!=='undefined')return localStorage;}catch(e){}return null;},
- serialize(){G.rngs=RNG.s;const z=G.zone;G.zone=null;const s=JSON.stringify(G,(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);G.zone=z;return s;},
- save(){if(!G||G.dead||G.ending)return;try{const st=this.storage();if(st)st.setItem('nr_save',this.serialize());}catch(e){}},
+ serialize(){return JSON.stringify({...G,saveVersion:3,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
+ save(){if(!G||G.dead||G.ending)return false;try{const st=this.storage();if(!st)throw Error('Storage unavailable');const next=this.serialize(),old=st.getItem('nr_save');if(old){try{this.validateSave(JSON.parse(old));st.setItem('nr_save_backup',old);}catch(e){}}st.setItem('nr_save',next);return true;}catch(e){this.log('Could not save on this device. Export your save from Settings.','#f66');return false;}},
  exportSave(){return this.serialize();},
- load(str){try{const st=this.storage();const s=str||(st&&st.getItem('nr_save'));if(!s)return false;const g=JSON.parse(s);if(!g||!g.p)return false;G=g;RNG.seed(G.rngs||G.seed);RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];G.zone.def=ZONES[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();return true;}catch(e){console.error(e);return false;}},
- hasSave(){const st=this.storage();return !!(st&&st.getItem('nr_save'));},
- clearSave(){try{const st=this.storage();if(st)st.removeItem('nr_save');}catch(e){}},
+ validateSave(g){
+  if(!g||!g.p||!CLASSES[g.p.cls]||!g.zones||!ZONES[g.zoneId]||!g.zones[g.zoneId])throw Error('Incomplete save');
+  if((g.saveVersion||1)>3)throw Error('This save needs a newer game version');
+  for(const k of ['inv','statuses','talents','chrome','flesh','zonesSeen'])if(!Array.isArray(g.p[k]))throw Error('Invalid player data');
+  for(const k of ['hp','xp','level','x','y'])if(!Number.isFinite(g.p[k]))throw Error('Invalid player numbers');
+  for(const z of Object.values(g.zones)){if(!ZONES[z.id]||!Number.isInteger(z.w)||!Number.isInteger(z.h)||z.w<1||z.h<1||!Array.isArray(z.t)||z.t.length!==z.w*z.h||z.t.some(t=>!TILE_DEFS[t]))throw Error('Invalid district');for(const k of ['ents','items','objs','seen','buildings','exits'])if(!Array.isArray(z[k]))throw Error('Incomplete district');}
+  const z=g.zones[g.zoneId];if(g.p.x<0||g.p.y<0||g.p.x>=z.w||g.p.y>=z.h)throw Error('Invalid position');
+  g.saveVersion=3;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  if(g.boatCampaign&&['hull','motor','fuel','supplies','bypass'].some(k=>typeof g.boatCampaign[k]!=='boolean'))throw Error('Invalid boat project data');
+  if(!Array.isArray(g.refuge.stash)||!g.p.eq||!g.flags||!g.quests||!g.rep)throw Error('Incomplete campaign data');
+  for(const it of [...g.p.inv,...Object.values(g.p.eq).filter(Boolean),...g.refuge.stash])if(!it||!ITEMS[it.id]||!Number.isFinite(it.qty)||it.qty<1)throw Error('Invalid saved item');
+  return g;
+ },
+ load(str){const previous=G,rs=RNG.s;this.loadError='';const st=this.storage();let candidates;
+  try{candidates=str!==undefined?[str]:[st&&st.getItem('nr_save'),st&&st.getItem('nr_save_backup')];}catch(e){this.loadError='Device storage is unavailable.';return false;}
+  for(let i=0;i<candidates.length;i++){if(!candidates[i])continue;try{const g=this.validateSave(JSON.parse(candidates[i]));G=g;RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();if(i>0)this.log('Recovered the previous autosave. Your most recent actions may be missing.','#fd8');return true;}catch(e){G=previous;RNG.s=rs;this.loadError=e.message;}}
+  return false;},
+ hasSave(){try{const st=this.storage();return !!(st&&(st.getItem('nr_save')||st.getItem('nr_save_backup')));}catch(e){return false;}},
+ clearSave(){try{const st=this.storage();if(st){st.removeItem('nr_save');st.removeItem('nr_save_backup');}}catch(e){}},
  loadMeta(){try{const st=this.storage();const s=st&&st.getItem('nr_meta');if(s)return Object.assign({runs:[],unlocks:{},codex:{},settings:{}},JSON.parse(s));}catch(e){}return{runs:[],unlocks:{},codex:{},settings:{}};},
  saveMeta(m){try{const st=this.storage();if(st)st.setItem('nr_meta',JSON.stringify(m));}catch(e){}}
+});
+
+</script>
+<script>
+/* ==== campaign.js ==== */
+'use strict';
+
+// Campaign projects use ordinary inventory and actions. Definitions are shared
+// by the preparation menu, journal and engine checks so costs cannot drift.
+const BOAT_PROJECTS = {
+ hull_repair: {stage:'hull', name:'Patch the hull', items:[['scrap',6],['cloth',2]], skill:['repair',2], minutes:5, xp:40},
+ hull_brace: {stage:'hull', name:'Brace the hull with extra material', items:[['scrap',10],['cloth',4]], minutes:10, xp:40},
+ hull_kesh: {stage:'hull', name:'Hire Kesh to patch the hull', items:[['scrap',4]], creds:80, kesh:true, minutes:5, xp:40},
+ motor: {stage:'motor', name:'Mount the outboard', items:[['outboard',1]], minutes:3, xp:50},
+ fuel: {stage:'fuel', name:'Fill the reserve tank', items:[['fuel',2]], minutes:1, xp:25},
+ supplies: {stage:'supplies', name:'Pack rations and water', items:[['ration',2],['water',2]], minutes:1, xp:25},
+ supplies_canned: {stage:'supplies', name:'Pack canned food and water', items:[['canned',4],['water',2]], minutes:1, xp:25},
+ supplies_kesh: {stage:'supplies', name:'Buy passage provisions from Kesh', items:[], creds:60, kesh:true, minutes:1, xp:25},
+ bypass: {stage:'bypass', name:'Rig a decoy beacon for the channel', items:[['electronics',3],['wire_spool',2]], technical:3, minutes:5, xp:60}
+};
+
+Object.assign(Game, {
+ boatState() {
+  if(!G.boatCampaign) {
+   // Existing assembled boats retain their earned departure eligibility.
+   const ready=!!G.flags.boat_parts;
+   G.boatCampaign={hull:ready,motor:ready,fuel:ready,supplies:ready,bypass:false};
+  }
+  return G.boatCampaign;
+ },
+ boatSite() {
+  if(!G||G.dead||G.ending||G.zoneId!=='docks')return false;
+  if(this.buildingAt(G.p.x,G.p.y)?.prefab==='kesh')return true;
+  return G.zone.t.some((t,k)=>t===T.BOAT&&this.dist(G.p.x,G.p.y,k%G.zone.w,Math.floor(k/G.zone.w))<=1);
+ },
+ boatwrightAvailable() {
+  return !!G.zones.docks?.ents.some(e=>e.def==='kesh'&&e.hp>0&&!e.hostile);
+ },
+ boatPassage() {
+  if(G.flags.bloat_dead)return 'The Mother is dead; the channel is scattered.';
+  if((G.rep.drowned||0)>=20)return 'The Drowned will let you pass (+20 standing).';
+  if(this.boatState().bypass)return 'Your decoy beacon will draw the Drowned away.';
+  return null;
+ },
+ boatChecklist() {
+  const s=this.boatState();
+  return [
+   {done:s.hull,text:'Hull sealed - repair it, use extra salvage, or hire Kesh'},
+   {done:s.motor,text:'Outboard mounted - Verge Machine Works or Flooded Warehouse'},
+   {done:s.fuel,text:'Reserve tank filled - 2 Fuel Cans; Fuel Depot or dock trade'},
+   {done:s.supplies,text:'Provisions packed - food and water, or buy a passage pack'},
+   {done:!!this.boatPassage(),text:this.boatPassage()||'Channel - Drowned +20, defeat the Mother, or build a decoy'}
+  ];
+ },
+ boatProjectRequirements(id) {
+  const p=BOAT_PROJECTS[id];if(!p)return ['Unknown project.'];
+  const missing=[];
+  if(!this.boatSite())missing.push('Work at the boat or Kesh\'s shack.');
+  if(this.boatState()[p.stage])missing.push('Already completed.');
+  if(p.kesh&&!this.boatwrightAvailable())missing.push('Kesh is unavailable. Use a salvage alternative.');
+  if(p.skill&&this.skill(p.skill[0])<p.skill[1])missing.push(`${p.skill[0]} ${p.skill[1]} required.`);
+  if(p.technical&&Math.max(this.skill('repair'),this.skill('hacking'))<p.technical)missing.push(`Repair or Hacking ${p.technical} required.`);
+  for(const [id,n] of p.items)if(this.countItem(id)<n)missing.push(`${ITEMS[id].name}: ${this.countItem(id)}/${n}.`);
+  if((p.creds||0)>G.p.creds)missing.push(`Creds: ${G.p.creds}/${p.creds}.`);
+  return missing;
+ },
+ boatProjectLabel(id) {
+  const p=BOAT_PROJECTS[id],costs=p.items.map(([id,n])=>`${n} ${ITEMS[id].name}`);
+  if(p.creds)costs.push(`${p.creds} creds`);
+  if(p.skill)costs.push(`${p.skill[0]} ${p.skill[1]}`);
+  if(p.technical)costs.push(`Repair or Hacking ${p.technical}`);
+  return `${p.name} - ${costs.join(' + ')}; about ${p.minutes} minutes`;
+ },
+ completeBoatProject(id) {
+  const missing=this.boatProjectRequirements(id);
+  if(missing.length){this.log(missing.join(' '),'#fd8');return false;}
+  const p=BOAT_PROJECTS[id];
+  for(const [it,n] of p.items)this.removeItem(it,n);
+  G.p.creds-=p.creds||0;
+  this.boatState()[p.stage]=true;
+  G.flags.boat_parts=this.boatState().motor&&this.boatState().fuel?1:0;
+  this.awardMilestone('boat:'+p.stage,p.xp,p.name);
+  this.log('Boat project completed: '+p.name+'.','#db8');
+  this.act(p.minutes*100);
+  this.save();return true;
+ },
+ boat() {
+  if(!this.boatSite())return;
+  this.startQuest('boat');const u=this.ui();if(!u)return;
+  const lines=this.boatChecklist().map(s=>(s.done?'[ready] ':'[needed] ')+s.text);
+  const opts=[];
+  for(const [stage,label] of Object.entries({hull:'Repair the hull',motor:'Fit the motor',fuel:'Stock fuel',supplies:'Pack provisions',bypass:'Plan a technical passage'})) {
+   if(this.boatState()[stage]||(stage==='bypass'&&this.boatPassage()))continue;
+   opts.push({t:label,f:()=>this.boatStageMenu(stage)});
+  }
+  if(this.boatChecklist().every(s=>s.done))opts.push({t:'Launch the boat - finish this run',f:()=>this.launchBoat()});
+  opts.push({t:'Return to the city',f:()=>{}});
+  if(u.clearNotifications)u.clearNotifications();
+  u.choice('KESH\'S BOAT\n\n'+lines.join('\n')+'\n\nDeliver projects in any order. Installed parts stay here. Supplies in your Last Light locker must be withdrawn first.',opts);
+ },
+ boatStageMenu(stage) {
+  if(!this.boatSite())return;const u=this.ui();if(!u)return;
+  const leads={hull:'Seal the hull with scrap and cloth. Skill saves material; Kesh can work for a fee.',motor:'Outboards: Verge Machine Works, or the Flooded Warehouse in Rust Docks.',fuel:'Fuel: the Fuel Depot in Rust Docks, garages, or Kesh\'s trade stock.',supplies:'Keep some food for yourself. Packed provisions cannot be eaten in the city.',bypass:'A decoy draws the Drowned away from your crossing. Alternatives: earn +20 standing through Brother Ludo, or defeat the Mother.'};
+  const opts=Object.keys(BOAT_PROJECTS).filter(id=>BOAT_PROJECTS[id].stage===stage).map(id=>({t:this.boatProjectLabel(id),f:()=>{
+   const missing=this.boatProjectRequirements(id);
+   u.choice(this.boatProjectLabel(id)+'\n\n'+(missing.length?missing.join('\n'):'Materials will be consumed. This work advances time.'),[
+    ...(!missing.length?[{t:'Complete this project',f:()=>{this.completeBoatProject(id);if(!G.dead&&!G.ending)this.boat();}}]:[]),
+    {t:'Back to boat',f:()=>this.boat()}
+   ]);
+  }}));
+  opts.push({t:'Back to boat',f:()=>this.boat()});u.choice(leads[stage]||'Boat project',opts);
+ },
+ buildRefugeInfirmary() {
+  const r=this.refugeState();
+  if(!this.atRefuge()||r.infirmary)return false;
+  if(!r.workbench||this.countItem('cloth')<6||this.countItem('chems')<2||this.countItem('scrap')<4){this.log('Needs a built workbench, 6 Cloth, 2 Chemicals and 4 Scrap in your pack.','#fd8');return false;}
+  this.removeItem('cloth',6);this.removeItem('chems',2);this.removeItem('scrap',4);
+  r.infirmary=true;this.awardMilestone('refuge:infirmary',50,'Last Light treatment corner');this.save();return true;
+ },
+ refugeTreatment() {
+  const r=this.refugeState();
+  if(!this.atRefuge()||!r.infirmary)return false;
+  if(r.treatedDay===G.day){this.log('The treatment corner needs fresh sterile supplies tomorrow.','#fd8');return false;}
+  if(G.p.hp>=G.p.d.maxhp&&!this.hasStatus('bleed')){this.log('You do not need treatment.','#8fd');return false;}
+  if(this.countItem('bandage')<1){this.log('Bring one Bandage from your pack.','#fd8');return false;}
+  this.removeItem('bandage',1);r.treatedDay=G.day;this.removeStatus('bleed');this.heal(20);
+  this.log('Clean dressings, a steady hand. Bleeding stopped; up to 20 HP restored.','#8fd');this.act(100);this.save();return true;
+ },
+ endingDetails(id) {
+  if(id!=='openwater')return ENDINGS[id];
+  const passages={peace:'At the mouth of the Sump, the Drowned lift their hands and let you pass. Ludo kept his word.',force:'At the mouth of the Sump, nothing gathers. The Mother is gone. You carry the silence downstream.',decoy:'Your beacon wakes on the far bank. Shapes turn toward its borrowed heartbeat. You kill the light and slip past.'};
+  const kesh=this.boatwrightAvailable()?'Kesh takes the tiller. For once, he has nothing to say.':'You take the tiller yourself. Kesh is not here to see his boat leave.';
+  return {...ENDINGS[id],text:'The patched hull holds. The outboard catches. Food and water knock softly against the spare fuel cans. '+kesh+' '+(passages[G.flags.boat_departure]||passages.peace)+' The river bends and the city disappears. For the first time in days, tomorrow asks for something other than survival.'};
+ },
+ launchBoat() {
+  if(!this.boatSite()||!this.boatChecklist().every(s=>s.done))return false;
+  const passage=this.boatPassage();
+  this.ui()?.confirm('The hull is sealed, the motor is ready, and provisions are aboard.\n'+passage+'\n\nLeave the city? This ends the run.',()=>{
+   if(!this.boatSite()||!this.boatChecklist().every(s=>s.done))return;
+   G.flags.boat_departure=G.flags.bloat_dead?'force':(G.rep.drowned||0)>=20?'peace':'decoy';
+   this.endRun('openwater');
+  });return true;
+ }
 });
 
 </script>
@@ -1970,24 +2198,30 @@ const Renderer=(function(){
 // ============================================================
 const Sound=(function(){
  const A={};let ac=null,master,sfxG,ambG,musG,noiseBuf=null;let started=false;
- A.vol={master:0.7,sfx:0.8,amb:0.6,music:0.45};A.muted=false;
+ A.vol={master:0.7,sfx:0.65,amb:0.3,music:0};A.muted=false;
+ let active=false;
+ const voices=new Set();
+ function track(source,nodes){voices.add(source);source.onended=()=>{voices.delete(source);source.disconnect();for(const n of nodes)n.disconnect();};}
+ A.setActive=function(value){active=!!value;A.applyVol();};
  const layers={};let curZone=null,musicTimer=null,ambTimer=null,chordI=0;
 
  A.start=function(){if(started)return;try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}started=true;
-  master=ac.createGain();master.connect(ac.destination);sfxG=ac.createGain();ambG=ac.createGain();musG=ac.createGain();
+  master=ac.createGain();const limiter=ac.createDynamicsCompressor();limiter.threshold.value=-12;limiter.knee.value=12;limiter.ratio.value=8;master.connect(limiter);limiter.connect(ac.destination);sfxG=ac.createGain();ambG=ac.createGain();musG=ac.createGain();
   sfxG.connect(master);ambG.connect(master);musG.connect(master);A.applyVol();
   noiseBuf=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
   startMusic();ambTimer=setInterval(ambTick,400);};
- A.resume=function(){if(ac&&ac.state==='suspended')ac.resume();};
- A.applyVol=function(){if(!ac)return;const m=A.muted?0:A.vol.master;master.gain.value=m;sfxG.gain.value=A.vol.sfx;ambG.gain.value=A.vol.amb;musG.gain.value=A.vol.music;};
+ A.resume=function(){if(ac&&active&&!document.hidden&&!A.muted&&ac.state==='suspended')ac.resume().catch(()=>{});};
+ A.applyVol=function(){if(!ac)return;const audible=active&&!document.hidden&&!A.muted;
+  for(const [node,value] of [[master,audible?A.vol.master:0],[sfxG,A.vol.sfx],[ambG,A.vol.amb],[musG,A.vol.music]]){node.gain.cancelScheduledValues(ac.currentTime);node.gain.setTargetAtTime(value,ac.currentTime,0.04);}
+  if(audible)A.resume();else{for(const source of voices){try{source.stop();}catch(e){}}if(ac.state==='running')ac.suspend().catch(()=>{});}};
 
  function noise(){const s=ac.createBufferSource();s.buffer=noiseBuf;s.loop=true;s.loopStart=Math.random();return s;}
  function env(g,t,a,peak,dec,sus){g.gain.cancelScheduledValues(t);g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(Math.max(0.0001,sus||0.0001),t+a+dec);}
 
  // ---------- one-shot SFX ----------
- function burstNoise(dur,freq,q,gain,type,dest){const t=ac.currentTime;const n=noise();const f=ac.createBiquadFilter();f.type=type||'bandpass';f.frequency.value=freq;f.Q.value=q||1;const g=ac.createGain();env(g,t,0.003,gain,dur);n.connect(f);f.connect(g);g.connect(dest||sfxG);n.start(t);n.stop(t+dur+0.05);}
- function tone(freq,dur,type,gain,slide,dest,delay){const t=ac.currentTime+(delay||0);const o=ac.createOscillator();o.type=type||'sine';o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);const g=ac.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(gain,t+0.005);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(dest||sfxG);o.start(t);o.stop(t+dur+0.05);}
- A.play=function(k,opt){if(!ac||A.muted)return;opt=opt||{};
+ function burstNoise(dur,freq,q,gain,type,dest){if(!active||document.hidden||A.muted)return;const t=ac.currentTime;const n=noise();const f=ac.createBiquadFilter();f.type=type||'bandpass';f.frequency.value=freq;f.Q.value=q||1;const g=ac.createGain();g.gain.value=0;env(g,t,0.003,gain,dur);n.connect(f);f.connect(g);g.connect(dest||sfxG);track(n,[f,g]);n.start(t);n.stop(t+dur+0.05);}
+ function tone(freq,dur,type,gain,slide,dest,delay){if(!active||document.hidden||A.muted)return;const t=ac.currentTime+(delay||0);const o=ac.createOscillator();o.type=type||'sine';o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);const g=ac.createGain();g.gain.value=0;g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(gain,t+0.015);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(dest||sfxG);track(o,[g]);o.start(t);o.stop(t+dur+0.05);}
+ A.play=function(k,opt){if(!ac||!active||document.hidden||A.muted)return;opt=opt||{};
   switch(k){
    case 'step':burstNoise(0.05,opt.wet?900:420+Math.random()*120,1.2,opt.wet?0.12:0.07,'bandpass');break;
    case 'hit':burstNoise(0.12,900,0.8,0.35,'lowpass');tone(120,0.12,'triangle',0.35,50);break;
@@ -2005,8 +2239,8 @@ const Sound=(function(){
    case 'quest':[440,554,659].forEach((f,i)=>tone(f,0.4,'sine',0.1,null,null,i*0.12));break;
    case 'death':tone(220,1.8,'sawtooth',0.18,40);burstNoise(1.5,200,0.5,0.3,'lowpass');break;
    case 'kill':tone(160,0.3,'triangle',0.18,60);break;
-   case 'echo':{const t=ac.currentTime;const o=ac.createOscillator(),m=ac.createOscillator(),mg=ac.createGain(),g=ac.createGain();o.type='sine';o.frequency.value=440;m.frequency.value=7+Math.random()*30;mg.gain.value=300;m.connect(mg);mg.connect(o.frequency);env(g,t,0.05,0.12,1.2);o.connect(g);g.connect(sfxG);o.start(t);m.start(t);o.stop(t+1.4);m.stop(t+1.4);burstNoise(0.6,3000,0.4,0.08,'highpass');break;}
-   case 'radio':burstNoise(0.7,1600,0.4,0.12,'bandpass');tone(880,0.5,'sine',0.03,860);break;
+   case 'echo':burstNoise(0.25,1200,0.5,0.07,'bandpass');break;
+   case 'radio':burstNoise(0.25,1600,0.4,0.06,'bandpass');break;
    case 'alert':tone(740,0.08,'square',0.07);tone(740,0.08,'square',0.07,null,null,0.12);break;
    case 'heal':tone(520,0.25,'sine',0.08,780);break;
    case 'zone':tone(110,1.5,'sine',0.15,55);burstNoise(1.2,400,0.5,0.1,'lowpass');break;
@@ -2020,7 +2254,7 @@ const Sound=(function(){
  function setLayer(name,on,vol){const L=layers[name];if(!L)return;const t=ac.currentTime;L.g.gain.cancelScheduledValues(t);L.g.gain.setTargetAtTime(on?(vol||0.2):0,t,1.2);L.on=on;}
  function buildLayers(){
   layer('rain',g=>{const n=noise();const f=ac.createBiquadFilter();f.type='highpass';f.frequency.value=1200;const f2=ac.createBiquadFilter();f2.type='lowpass';f2.frequency.value=7000;n.connect(f);f.connect(f2);f2.connect(g);n.start();return[n];});
-  layer('hum',g=>{const o=ac.createOscillator();o.frequency.value=55;const o2=ac.createOscillator();o2.frequency.value=110.4;const g2=ac.createGain();g2.gain.value=0.3;o.connect(g);o2.connect(g2);g2.connect(g);o.start();o2.start();return[o,o2];});
+  layer('hum',g=>{const n=noise();const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=180;n.connect(f);f.connect(g);n.start();return[n];});
   layer('wind',g=>{const n=noise();const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=500;f.Q.value=0.6;const l=ac.createOscillator();l.frequency.value=0.08;const lg=ac.createGain();lg.gain.value=300;l.connect(lg);lg.connect(f.frequency);n.connect(f);f.connect(g);n.start();l.start();return[n,l];});
   layer('water',g=>{const n=noise();const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=380;const l=ac.createOscillator();l.frequency.value=0.2;const lg=ac.createGain();lg.gain.value=120;l.connect(lg);lg.connect(f.frequency);n.connect(f);f.connect(g);n.start();l.start();return[n,l];});
   layer('crowd',g=>{const n=noise();const f=ac.createBiquadFilter();f.type='bandpass';f.frequency.value=700;f.Q.value=2;const l=ac.createOscillator();l.frequency.value=0.6;const lg=ac.createGain();lg.gain.value=0.5;const vg=ac.createGain();vg.gain.value=0.5;l.connect(lg);lg.connect(vg.gain);n.connect(f);f.connect(vg);vg.connect(g);n.start();l.start();return[n,l];});
@@ -2031,26 +2265,20 @@ const Sound=(function(){
  const AMB_VOL={rain:0.22,hum:0.06,wind:0.12,water:0.2,crowd:0.08,industrial:0.35,static:0.05,drip:0,muzak:0};
  A.setZone=function(){if(!ac||!G||!G.zone)return;if(!layers.rain)buildLayers();const amb=(G.zone.def.ambient||[]).slice();if(G.rain&&G.zone.kind!=='tunnel')amb.push('rain');
   for(const n in layers)setLayer(n,amb.includes(n),AMB_VOL[n]*(Game.isNight()?1.2:1));curZone=G.zone.id;};
- function ambTick(){if(!ac||!G||!G.zone||A.muted)return;const amb=G.zone.def.ambient||[];
-  if(amb.includes('drip')&&Math.random()<0.25)tone(1200+Math.random()*1400,0.18,'sine',0.04*A.vol.amb,600,ambG);
-  if(amb.includes('industrial')&&Math.random()<0.05){burstNoise(0.4,200+Math.random()*1800,6,0.12,'bandpass',ambG);}
-  if(amb.includes('muzak')&&Math.random()<0.3){const s=[523,587,659,784,880];tone(s[(Math.random()*5)|0]*(Math.random()<0.5?0.5:1),0.9,'triangle',0.025,null,ambG);}
+ function ambTick(){if(!ac||!active||document.hidden||!G||!G.zone||A.muted)return;const amb=G.zone.def.ambient||[];
+  if(amb.includes('drip')&&Math.random()<0.12)burstNoise(0.06,900,0.5,0.025,'bandpass',ambG);
+  if(amb.includes('industrial')&&Math.random()<0.025){burstNoise(0.25,240,0.5,0.04,'lowpass',ambG);}
   if(amb.includes('static')&&Math.random()<0.06)burstNoise(0.08,4000,1,0.1,'highpass',ambG);
-  if(Game.isNight()&&Math.random()<0.02)tone(90+Math.random()*40,2.5,'sine',0.05,60,ambG); // distant things
-  if(G.attention>=40&&Math.random()<0.015)A.play('radio');
-  const want=(G.rain&&G.zone.kind!=='tunnel');if(layers.rain&&layers.rain.on!==want)A.setZone();}
+  const want=amb.includes('rain')||!!(G.rain&&G.zone.kind!=='tunnel');if(layers.rain&&layers.rain.on!==want)A.setZone();}
 
  // ---------- music: slow minor pad ----------
  const CHORDS=[[57,60,64],[53,57,60],[55,59,62],[52,55,59],[57,60,64],[50,53,57],[52,56,59],[45,52,57]];
  function mtof(m){return 440*Math.pow(2,(m-69)/12);}
- function startMusic(){const play=()=>{if(!ac)return;if(A.muted||!A.vol.music){musicTimer=setTimeout(play,4000);return;}
-   const night=G&&Game.isNight?Game.isNight():false;const att=G?G.attention:0;const ch=CHORDS[chordI++%CHORDS.length];
-   const t=ac.currentTime;const dur=9;
-   const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=night?500:900;f.Q.value=0.7;const g=ac.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(0.05,t+3);g.gain.linearRampToValueAtTime(0.0001,t+dur);f.connect(g);g.connect(musG);
-   const notes=ch.map(n=>n-(night?12:0));if(att>=30)notes.push(notes[0]+6);// tritone creeps in
-   for(const n of notes)for(const det of [-6,6]){const o=ac.createOscillator();o.type='sawtooth';o.frequency.value=mtof(n);o.detune.value=det;o.connect(f);o.start(t);o.stop(t+dur+0.1);}
-   if(Math.random()<0.5){const o=ac.createOscillator();o.type='sine';o.frequency.value=mtof(ch[(Math.random()*3)|0]+24);const g2=ac.createGain();env(g2,t+2+Math.random()*3,0.01,0.03,2.5);o.connect(g2);g2.connect(musG);o.start(t);o.stop(t+dur);}
-   musicTimer=setTimeout(play,(dur-1.5)*1000);};
+ function startMusic(){const play=()=>{if(!ac)return;if(!active||document.hidden||A.muted||!A.vol.music){musicTimer=setTimeout(play,2000);return;}
+   // Optional, quiet chords with space between them; no random high notes.
+   const ch=CHORDS[chordI++%CHORDS.length];
+   for(const n of ch)tone(mtof(n-12),3,'sine',0.018,null,musG);
+   musicTimer=setTimeout(play,12000);};
   play();}
  return A;
 })();
@@ -2073,7 +2301,8 @@ function clear(n){while(n&&n.firstChild)n.removeChild(n.firstChild);}
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
 let meta=null,settings=null;
-const DEFAULT_SETTINGS={master:0.7,music:0.45,sfx:0.8,amb:0.6,muted:false,anim:true,zoom:1,touch:'auto',hints:true,bigText:false};
+const ZOOM_LEVELS=[0.5,0.65,0.8,1,1.25,1.5,1.75,2];
+const DEFAULT_SETTINGS={master:0.7,music:0,sfx:0.65,amb:0.3,muted:false,anim:true,zoom:1,touch:'auto',hints:true,bigText:false,audioVersion:2};
 let screens={},canvas=null,sideTab='gear',modalStack=[],target=null,walking=null,lastZone=null,lastEnemyCount=0,refreshQueued=false;
 
 // ============================================================
@@ -2091,6 +2320,10 @@ function build(){
  const main=el('div','main',g);
  const cw=el('div','canvaswrap',main);cw.id='cw';
  canvas=el('canvas','map',cw);
+ const zoom=el('div','map-zoom',cw);zoom.setAttribute('aria-label','Map zoom');
+ const zout=btn(zoom,'−',()=>changeZoom(-1));zout.id='zoom-out';zout.setAttribute('aria-label','Zoom out');zout.title='Zoom out (− or mouse wheel)';
+ const reset=btn(zoom,'100%',()=>setZoom(1));reset.id='zoom-reset';reset.setAttribute('aria-label','Reset map zoom');reset.title='Reset zoom (0)';
+ const zin=btn(zoom,'+',()=>changeZoom(1));zin.id='zoom-in';zin.setAttribute('aria-label','Zoom in');zin.title='Zoom in (+ or mouse wheel)';
  el('div','threats',cw).id='threats';
  el('div','ctx-btn hidden',cw).id='ctxbtn';
  el('div','tooltip hidden',cw).id='tooltip';
@@ -2107,16 +2340,21 @@ function build(){
 // ============================================================
 // SETTINGS / META
 // ============================================================
-function loadSettings(){meta=Game.loadMeta();settings=Object.assign({},DEFAULT_SETTINGS,meta.settings||{});applySettings();}
+function loadSettings(){meta=Game.loadMeta();settings=Object.assign({},DEFAULT_SETTINGS,meta.settings||{});
+ if(meta.settings&&meta.settings.audioVersion!==2){if(settings.music===0.45)settings.music=0;if(settings.amb===0.6)settings.amb=0.3;if(settings.sfx===0.8)settings.sfx=0.65;settings.audioVersion=2;meta.settings=settings;Game.saveMeta(meta);}
+ settings.zoom=Number.isFinite(+settings.zoom)?Math.max(0.5,Math.min(2,+settings.zoom)):1;applySettings();}
+function setZoom(value){settings.zoom=Math.max(0.5,Math.min(2,value));Renderer.hover=null;saveSettings();}
+function changeZoom(dir){const z=settings.zoom;const next=dir>0?ZOOM_LEVELS.find(v=>v>z+0.01):ZOOM_LEVELS.slice().reverse().find(v=>v<z-0.01);if(next!==undefined)setZoom(next);}
 function saveSettings(){meta=Game.loadMeta();meta.settings=settings;Game.saveMeta(meta);applySettings();}
 function applySettings(){Object.assign(Sound.vol,{master:settings.master,music:settings.music,sfx:settings.sfx,amb:settings.amb});Sound.muted=settings.muted;Sound.applyVol();
  Renderer.anim=settings.anim?1:0;Renderer.zoom=settings.zoom;document.body.classList.toggle('bigtext',!!settings.bigText);
- const showTouch=settings.touch==='on'||(settings.touch==='auto'&&isTouch);document.body.classList.toggle('show-touch',showTouch);resize();}
+ const showTouch=settings.touch==='on'||(settings.touch==='auto'&&isTouch);document.body.classList.toggle('show-touch',showTouch);
+ if($('#zoom-reset')){$('#zoom-reset').textContent=Math.round(settings.zoom*100)+'%';$('#zoom-out').disabled=settings.zoom<=0.5;$('#zoom-in').disabled=settings.zoom>=2;}resize();}
 
 // ============================================================
 // TITLE
 // ============================================================
-function show(name){for(const k in screens)screens[k].classList.toggle('hidden',k!==name);if(name==='game'){resize();}}
+function show(name){for(const k in screens)screens[k].classList.toggle('hidden',k!==name);Sound.setActive(name==='game');if(name==='game'){resize();}}
 function showTitle(){
  loadSettings();if($('#toasts'))clearToasts();show('title');const t=screens.title;clear(t);
  t.style.backgroundImage=`url(${window.ASSETS.title})`;
@@ -2126,7 +2364,8 @@ function showTitle(){
  el('h1',null,box,'NIGHT RUN');
  el('div','title-tag',box,'One person. One city. It already knows your name.');
  const btns=el('div','title-btns',box);
- if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast('Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
+ btn(btns,'Import save',()=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=async()=>{const file=input.files[0];if(!file)return;try{if(Game.load(await file.text())){Game.save();Sound.start();enterGame();}else toast(Game.loadError||'Invalid save.','#f66');}catch(e){toast('Could not read that save.','#f66');}};input.click();});
+ if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast(Game.loadError||'Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
  btn(btns,'New Run',()=>{Sound.start();if(Game.hasSave())confirmBox('Starting a new run abandons your current one. The city will not remember you.',()=>{Game.clearSave();showCreate();});else showCreate();},Game.hasSave()?'':'primary');
  btn(btns,'Codex',()=>{Sound.start();showCodex();});
  btn(btns,'Past Runs',()=>{Sound.start();showRuns();});
@@ -2325,6 +2564,11 @@ function paneAbil(pane){
  for(const [k,lab,fn] of [['R','Reload',()=>Game.reload()],['F','Fire at target',startFire],['T','Throw…',throwMenu],['Z','Rest (wait 10 turns)',rest],['X','Examine',()=>startLook()],['E','Interact / context',contextAction]]){const r=el('div','card-row',pane,`<b>[${k}]</b> ${lab}`);r.onclick=()=>{$('#side').classList.remove('open');fn();refresh();};}
 }
 function paneQuest(pane){
+ el('div','sec',pane,'Your refuge - Last Light');
+ el('div','small',pane,'Use a bed at the Last Light in Ashgrove to access your locker, rest, or build a workbench. Stored items stay here for this run.');
+ if(Game.atRefuge())el('button','btn',pane,'Open refuge').onclick=()=>Game.refugeMenu();
+
+ if(G.quests.boat){el('div','sec',pane,'Boat preparations');for(const step of Game.boatChecklist())el('div','small',pane,(step.done?'Ready: ':'Needed: ')+step.text);if(Game.boatSite())el('button','btn',pane,'Work on the boat').onclick=()=>Game.boat();}
  const ids=Object.keys(G.quests);
  const act=ids.filter(i=>G.quests[i].state==='active'),done=ids.filter(i=>G.quests[i].state!=='active');
  if(!ids.length)el('div','muted',pane,'No leads yet. People talk. Listen.');
@@ -2472,6 +2716,7 @@ const UI={
    case 'glitch':Sound.play('echo');break;case 'levelup':Sound.play('level');toast('Level up! Spend your points in Character (C).','#ffe27a');break;case 'quest':Sound.play('quest');break;
    case 'zone':Sound.play('zone');break;case 'reload':Sound.play('reload');break;case 'shake':Sound.play('boom');break;}},
  confirm(text,yes){confirmBox(text,yes);},
+ clearNotifications(){clearToasts();},
  choice(text,opts){modal(box=>{el('div','mtext',box,esc(text));const o=el('div','opts',box);for(const op of opts){if(op.cond&&!op.cond())continue;const b=el('button','opt',o,esc(op.t));b.onclick=()=>{closeModal();op.f&&op.f();refresh();};}},{noClose:true});},
  openLoot(c,x,y){const draw=()=>{if(!c.items.length){closeModal();refresh();return;}modal(box=>{el('h3',null,box,esc(c.kind[0].toUpperCase()+c.kind.slice(1)));el('div','muted small',box,`Pack ${Game.totalWeight()} / ${G.p.d.carry} kg`);
    const o=el('div','loot',box);for(const it of c.items.slice()){const d=ITEMS[it.id];const r=el('div','loot-row',o,`${icon(it.id,28)}<div class="grow"><b style="color:${d.col}">${esc(Game.itemName(it))}</b><div class="muted small">${esc(d.desc)}</div></div><span class="muted small">${(d.wt*(it.qty||1)).toFixed(1)}kg</span>`);r.onclick=()=>{if(Game.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}draw();};}
@@ -2531,7 +2776,7 @@ function epitaph(s){if(s.days<=1)return 'The city barely noticed.';if(s.attentio
 // PAUSE / SETTINGS / HELP / CODEX / RUNS
 // ============================================================
 function pauseMenu(){modal(box=>{el('h3',null,box,'Paused');el('div','muted small',box,`${esc(G.p.name)} · Day ${G.day} ${Game.timeStr()} · ${esc(G.zone.name)}`);const o=el('div','opts',box);
- const items=[['Resume',()=>{}],['Save',()=>{Game.save();toast('Saved.','#8f8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{Game.save();showTitle();}]];
+ const items=[['Resume',()=>{}],['Save',()=>{toast(Game.save()?'Saved.':'Save failed. Export a backup from Settings.','#fd8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{if(Game.save())showTitle();else toast('Save failed. Export a backup from Settings before quitting.','#f66');}]];
  for(const [l,f] of items){const b=el('button','opt',o,l);b.onclick=()=>{closeModal();f();};}});}
 function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const sl=(lab,key)=>{const r=el('div','set-row',box);el('span',null,r,lab);const i=el('input',null,r);i.type='range';i.min=0;i.max=1;i.step=0.05;i.value=settings[key];i.oninput=()=>{settings[key]=+i.value;saveSettings();};};
@@ -2539,7 +2784,9 @@ function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const tg=(lab,key)=>{const r=el('div','set-row',box);el('span',null,r,lab);const i=el('input',null,r);i.type='checkbox';i.checked=!!settings[key];i.onchange=()=>{settings[key]=i.checked;saveSettings();};};
  tg('Mute all','muted');tg('Animations & screen effects','anim');tg('Tutorial hints','hints');tg('Larger text','bigText');
  const sel=(lab,key,opts)=>{const r=el('div','set-row',box);el('span',null,r,lab);const s=el('select',null,r);for(const [v,t] of opts){const o=el('option',null,s,t);o.value=v;if(String(settings[key])===String(v))o.selected=true;}s.onchange=()=>{settings[key]=isNaN(+s.value)?s.value:+s.value;saveSettings();};};
- sel('Map zoom','zoom',[[0.8,'Far'],[1,'Normal'],[1.25,'Close'],[1.5,'Closest']]);sel('Touch controls','touch',[['auto','Auto'],['on','Always'],['off','Never']]);
+ sel('Map zoom','zoom',ZOOM_LEVELS.map(v=>[v,Math.round(v*100)+'%']));sel('Touch controls','touch',[['auto','Auto'],['on','Always'],['off','Never']]);
+ el('div','small muted',box,'Music is optional and off by default. Ambience uses quiet environmental textures.');
+ if(G&&!G.dead&&!G.ending){const download=el('button','opt',box,'Export save backup');download.onclick=()=>{const url=URL.createObjectURL(new Blob([Game.exportSave()],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='nightrun-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
  const r=el('div','opts',box);const b=el('button','opt',r,'Reset hints');b.onclick=()=>{meta=Game.loadMeta();meta.hints={};Game.saveMeta(meta);toast('Hints will show again.','#8f8');};
  if(G&&!screens.game.classList.contains('hidden')){}else{const bk=el('button','opt',r,'Back');bk.onclick=()=>{closeModal();};}});}
 function showHelp(){modal(box=>{el('h3',null,box,'How to survive');box.insertAdjacentHTML('beforeend',`
@@ -2550,6 +2797,7 @@ function showHelp(){modal(box=>{el('h3',null,box,'How to survive');box.insertAdj
 <div><b>1 2 3</b> abilities · <b>. / 5 / Space</b> wait · <b>Z</b> rest 10 turns · <b>X</b> examine</div>
 <div><b>I C H Q P M</b> gear, character, abilities, quests, factions (P), city map · <b>K</b> craft (Pickers) · <b>Esc</b> menu</div>
 <div><b>Touch</b> pad to move, the gold button does the obvious thing, long-press to examine.</div>
+<div><b>Zoom</b> map −/+ buttons · mouse wheel over the map · +/− keys · 0 resets. Your zoom is saved.</div>
 <hr>
 <p><b>Time</b> passes with every action. Night (20:00–06:00) cuts your sight, brings out ghouls and worse, and closes vendors — but night caches appear and patrols thin out.</p>
 <p><b>Injuries</b> outlast the fight. Bleeding needs bandages, fractures a splint, infection antibiotics. Hunger and fatigue are slow but real: eat, and sleep in beds — safe beds are in faction buildings.</p>
@@ -2607,6 +2855,7 @@ function onKey(ev){
   if(k==='g'){const a=$('#modal .opt.primary');if(a)a.click();}
   return;}
  if(G.dead||G.ending)return;
+ if(!ev.ctrlKey&&!ev.metaKey&&['+','=','-','_','0'].includes(k)){if(k==='0')setZoom(1);else changeZoom(k==='+'||k==='='?1:-1);ev.preventDefault();return;}
  let mv=MOVE[code]||MOVE[k];if(ev.key&&/^[1-9]$/.test(ev.key)&&code&&code.startsWith('Numpad'))mv=MOVE[code];
  if(target){if(k==='Escape'){cancelTarget();ev.preventDefault();return;}if(k==='Enter'||k==='f'||k===' '){confirmTarget();ev.preventDefault();return;}if(k==='Tab'){moveCursor(1,0);ev.preventDefault();return;}if(mv){moveCursor(mv[0],mv[1]);ev.preventDefault();return;}return;}
  if(mv){doMove(mv[0],mv[1]);ev.preventDefault();return;}
@@ -2622,6 +2871,8 @@ function onKey(ev){
 function openTab(t){sideTab=t;$('#side').classList.add('open');renderSide();}
 function wire(){
  window.addEventListener('keydown',onKey);
+ let lastZoomWheel=0;
+ canvas.addEventListener('wheel',ev=>{if(modalOpen()||ev.ctrlKey||ev.metaKey||!ev.deltaY)return;ev.preventDefault();const now=performance.now();if(now-lastZoomWheel<90)return;lastZoomWheel=now;changeZoom(ev.deltaY<0?1:-1);},{passive:false});
  canvas.addEventListener('mousemove',ev=>{if(!G)return;const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(ev.clientX-r.left,ev.clientY-r.top);Renderer.hover=t;
   if(target&&target.mode==='tile'&&Game.dist(t.x,t.y,G.p.x,G.p.y)<=target.range){target.cursor={x:t.x,y:t.y};Renderer.targets=[target.cursor];}
   const d=describeTile(t.x,t.y);if(d&&!target)showTip(d,{x:ev.clientX,y:ev.clientY});});
@@ -2630,7 +2881,7 @@ function wire(){
  canvas.addEventListener('pointerdown',ev=>{Sound.start();Sound.resume();press={x:ev.clientX,y:ev.clientY,t:performance.now(),long:false};if(ev.pointerType==='touch'){press.timer=setTimeout(()=>{press.long=true;const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(ev.clientX-r.left,ev.clientY-r.top);Renderer.hover=t;showTip(describeTile(t.x,t.y),{x:ev.clientX,y:ev.clientY},true);},450);}});
  canvas.addEventListener('pointerup',ev=>{if(!press)return;clearTimeout(press.timer);const long=press.long;press=null;if(long)return;tapAt(ev.clientX,ev.clientY);});
  canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(ev.clientX-r.left,ev.clientY-r.top);showTip(describeTile(t.x,t.y),{x:ev.clientX,y:ev.clientY},true);});
- document.addEventListener('visibilitychange',()=>{if(document.hidden&&G&&!G.dead&&!G.ending)Game.save();});
+ document.addEventListener('visibilitychange',()=>{Sound.setActive(!document.hidden&&!screens.game.classList.contains('hidden'));if(document.hidden&&G&&!G.dead&&!G.ending)Game.save();});
  window.addEventListener('beforeunload',()=>{if(G&&!G.dead&&!G.ending)Game.save();});
 }
 function tapAt(cx,cy){if(!G||modalOpen()||G.dead||G.ending)return;const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(cx-r.left,cy-r.top);
@@ -2659,6 +2910,9 @@ function buildTouch(){const t=$('#touch');clear(t);const pad=el('div','pad',t);
 // CSS
 // ============================================================
 const CSS=`
+.map-zoom{position:absolute;top:12px;right:12px;z-index:8;display:flex;gap:4px;padding:4px;border:1px solid #494553;border-radius:8px;background:#101017eb}
+.map-zoom .btn{min-width:38px;min-height:38px;padding:6px 9px;font-size:15px;touch-action:manipulation}
+.map-zoom #zoom-reset{min-width:64px;font-size:12px}
 @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
 :root{--bg:#07070a;--panel:#0f0f14;--panel2:#15151c;--line:#26262f;--text:#d8d6d0;--muted:#8a8894;--gold:#ffe27a;--red:#ff5a5a;--font:'IBM Plex Mono','Courier New',monospace;--pix:'Silkscreen','Courier New',monospace}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}

@@ -1,5 +1,5 @@
 const fs=require('fs');
-const files=['data.js','content.js','gen.js','engine.js','engine2.js','render.js','audio.js','ui.js'];
+const files=['data.js','content.js','gen.js','engine.js','engine2.js','campaign.js','render.js','audio.js','ui.js'];
 const atlas=fs.readFileSync('assets/atlas.png').toString('base64');
 const idx=JSON.parse(fs.readFileSync('assets/atlas.json','utf8'));
 const title=fs.readFileSync('assets/title.jpg').toString('base64');

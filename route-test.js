@@ -1,0 +1,41 @@
+// Functional route scenarios, not combat playthroughs: use generated supplies,
+// scripted travel and a frozen enemy phase to isolate quest/departure logic.
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const mem=new Map(),ctx={console,assert,localStorage:{getItem:k=>mem.get(k)||null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)}};vm.createContext(ctx);
+vm.runInContext(['data.js','content.js','gen.js','engine.js','engine2.js','campaign.js'].map(f=>fs.readFileSync(__dirname+'/'+f,'utf8')).join('\n'),ctx);
+vm.runInContext(`
+let choices=[],lastEnding=null;const ui={onLog(){},refresh(){},fx(){},confirm(t,f){f();},choice(t,o){choices=o;},showEnd(s,e){lastEnding={s,e};},showDialogue(){},closeDialogue(){}};Game.ui=()=>ui;Game.advanceWorld=()=>{};
+function fresh(cls='soldier',seed=42){Game.newGame('Route test',cls,seed);lastEnding=null;for(const slot of Object.keys(G.p.eq))if(G.p.eq[slot])Game.unequip(slot);for(const it of G.p.inv.slice())Game.refugeTransfer(it,false);}
+function collect(id,n){let need=n;for(const zid of Object.keys(ZONES)){const z=Game.ensureZone(zid);for(const list of [z.items,...Object.values(z.conts).map(c=>c.items)])for(const it of list.slice()){if(it.id!==id||need<=0)continue;const take=Math.min(need,it.qty);const inst={...it,qty:take};delete inst.x;delete inst.y;assert.equal(Game.addItemChecked(inst),true,'Carry '+id);it.qty-=take;if(it.qty<=0)list.splice(list.indexOf(it),1);need-=take;}}assert.equal(need,0,'Generated supply '+id);}
+function site(zid,t){Game.enterZone(zid,null);const k=G.zone.t.indexOf(t);assert.ok(k>=0,'Missing interaction');const x=k%G.zone.w,y=Math.floor(k/G.zone.w);const spot=DIRS8.map(([dx,dy])=>[x+dx,y+dy]).find(([x,y])=>Game.walkable(x,y)&&!Game.entAt(x,y));assert.ok(spot,'Interaction adjacency');[G.p.x,G.p.y]=spot;Game.computeFov();return {x,y};}
+function chooseNpc(nid,node,match){const o=DLG[nid][node](G).opts.find(o=>o.t.includes(match)&&(!o.cond||o.cond()));assert.ok(o,'Dialogue '+nid+' '+match);const e=Game.ensureZone(NPCS[nid].zone).ents.find(e=>e.def===nid);assert.ok(e);Game.dlgChoose(e,o);Game.checkQuests();}
+function build(id){const p=BOAT_PROJECTS[id];for(const [it,n] of p.items)collect(it,n);site('docks',T.BOAT);assert.equal(Game.completeBoatProject(id),true,'Project '+id);const snapshot=Game.exportSave(),before=JSON.stringify({p:G.p,boat:G.boatCampaign,turn:G.turn,rng:RNG.s});assert.equal(Game.completeBoatProject(id),false,'Duplicate project');assert.ok(JSON.stringify({p:G.p,boat:G.boatCampaign,turn:G.turn,rng:RNG.s})===before,'No duplicate cost/reward');assert.equal(Game.load(snapshot),true);}
+for(const mode of ['peace','force','decoy']){
+ fresh();site('docks',T.BOAT);Game.boat();assert.equal(Game.launchBoat(),false);const empty=Game.exportSave();assert.equal(Game.completeBoatProject('motor'),false);assert.equal(Game.exportSave().includes('"motor":true'),false);
+ // Out of order delivery is intentional, and each step survives reloading.
+ build('fuel');build('motor');build('hull_brace');build('supplies_canned');
+ if(mode==='peace'){collect('meat',3);chooseNpc('ludo','offer','think on it');chooseNpc('ludo','start','An offering');assert.ok(G.rep.drowned>=20);}
+ if(mode==='force'){const mother=Game.ensureZone('docks').ents.find(e=>e.def==='bloat_mother');Game.damage(mother,mother.hp+1,'scenario','P');assert.equal(G.flags.bloat_dead,1);}
+ if(mode==='decoy'){G.p.skills.repair=3;Game.computeDerived();build('bypass');}
+ site('docks',T.BOAT);Game.checkQuests();assert.equal(Game.launchBoat(),true);assert.equal(G.ending,'openwater');assert.equal(G.quests.boat.state,'done');assert.equal(G.flags.boat_departure,mode);assert.equal(Game.hasSave(),false);assert.ok(lastEnding.e.text.includes(mode==='peace'?'Ludo kept his word':mode==='force'?'Mother is gone':'beacon wakes'));assert.ok(lastEnding.s.quests>=1);
+ const runs=Game.loadMeta().runs.length;Game.endRun('openwater');assert.equal(Game.loadMeta().runs.length,runs);
+}
+console.log('PASS boat: three passage branches, generated supplies, separate/out-of-order deliveries, reloads, costs, one-time rewards and completed ending summaries');
+fresh();site('docks',T.BOAT);G.flags.boat_parts=1;delete G.boatCampaign;assert.ok(Game.boatChecklist().slice(0,4).every(s=>s.done),'Legacy assembled boat');G.rep.drowned=25;Game.checkQuests();assert.equal(G.flags.channel_clear,1);G.rep.drowned=-25;Game.checkQuests();assert.equal(G.flags.channel_clear,0);assert.equal(Game.launchBoat(),false);
+G.zone.ents=G.zone.ents.filter(e=>e.def!=='kesh');assert.ok(Game.boatProjectRequirements('hull_kesh').some(s=>s.includes('unavailable')));G.boatCampaign.hull=false;build('hull_brace');
+console.log('PASS legacy assembled boat migration, revoked goodwill and Kesh-independent repairs');
+for(const id of ['hull_repair','hull_kesh','supplies','supplies_kesh']){fresh();site('docks',T.BOAT);G.p.skills.repair=2;Game.computeDerived();G.p.creds=200;const p=BOAT_PROJECTS[id];for(const [it,n] of p.items)collect(it,n);const before=G.p.creds;assert.equal(Game.completeBoatProject(id),true);assert.equal(G.p.creds,before-(p.creds||0));for(const [it] of p.items)assert.equal(Game.countItem(it),0);}
+fresh();site('docks',T.BOAT);G.p.creds=0;assert.equal(Game.completeBoatProject('supplies_kesh'),false);assert.equal(Game.boatState().supplies,false);
+console.log('PASS skilled/paid project alternatives and exact material/currency consumption');
+
+fresh();collect('rotor',1);collect('avgas',1);site('carbon',T.HELIPAD);Game.helipad();assert.equal(G.flags.heli_ready,1);assert.ok(G.quests.skyhook.stage>=2,'Journal advances after consuming parts');Game.helipad();assert.equal(G.ending,null,'Warden blocks departure');G.flags.heli_access=1;Game.helipad();assert.equal(G.ending,'skyhook');assert.equal(G.quests.skyhook.state,'done');assert.equal(Game.hasSave(),false);
+fresh();collect('powercell',3);chooseNpc('dace','train','find them');chooseNpc('dace','start','I have 3');assert.equal(G.flags.platform_open,1);const sw=site('sump',T.SWITCH);Game.terminal(sw.x,sw.y);const mechanic=choices.find(o=>o.t.includes('mechanic'));assert.ok(mechanic,'No skill or reputation catch-22 after delivering cells');mechanic.f();assert.equal(G.flags.train_powered,1);site('sump',T.TRAIN);Game.train();assert.equal(G.ending,'lasttrain');assert.equal(G.quests.power.state,'done');
+for(const answer of ['Yes.','No.']){fresh('listener');site('static',T.HEART);Game.heart();assert.equal(lastEnding,null);Game.giveItem('shard',3);Game.heart();choices.find(o=>o.t===answer).f();assert.equal(G.ending,answer==='Yes.'?'answer':'refuse');assert.equal(G.quests.chorus.state,'done');}
+console.log('PASS helicopter, train, and both Heart endings; negative gates, resource handoffs and journal completion (Heart shards supplied as fixture)');
+fresh();G.p.hp=1;Game.die('test');const n=Game.loadMeta().runs.length;Game.endRun('openwater');assert.equal(G.ending,null);assert.equal(Game.loadMeta().runs.length,n);
+fresh();const mags=G.zone.ents.find(e=>e.def==='mags');Game.talk(mags);assert.ok(DLG.mags.start(G).opts.find(o=>o.t==='What is this place?').cond(),'First conversation remains available');
+Game.refugeState().workbench=true;collect('cloth',6);collect('chems',2);collect('scrap',4);assert.equal(Game.buildRefugeInfirmary(),true);assert.equal(Game.buildRefugeInfirmary(),false);collect('bandage',2);G.p.hp-=25;Game.addStatus('bleed',20);assert.equal(Game.refugeTreatment(),true);assert.equal(Game.hasStatus('bleed'),false);const bands=Game.countItem('bandage');assert.equal(Game.refugeTreatment(),false);assert.equal(Game.countItem('bandage'),bands);assert.equal(Game.load(Game.exportSave()),true);assert.equal(Game.refugeTreatment(),false);
+fresh();G.zone.ents=[];G.p.x=20;G.p.y=20;Game.setTile(20,20,T.FLOOR);Game.setTile(21,20,T.FLOOR);const guard=Game.makeEnemy(GROUPS.saints[0],21,20,G.zone,{});G.zone.ents=[guard];const standing=G.rep.saints,hp=G.p.hp;Game.move(1,0);assert.ok(choices.some(o=>o.t.startsWith('Attack')));choices.find(o=>o.t==='Ask them to move aside').f();assert.equal(G.p.x,21);assert.equal(guard.x,20);assert.equal(G.rep.saints,standing);assert.equal(G.p.hp,hp);
+console.log('PASS friendly passage preserves health and faction standing');
+console.log('PASS death cannot become escape, opening conversation, treatment construction, daily limit and save persistence');
+`,ctx);

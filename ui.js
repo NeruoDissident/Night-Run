@@ -13,7 +13,8 @@ function clear(n){while(n&&n.firstChild)n.removeChild(n.firstChild);}
 const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
 let meta=null,settings=null;
-const DEFAULT_SETTINGS={master:0.7,music:0.45,sfx:0.8,amb:0.6,muted:false,anim:true,zoom:1,touch:'auto',hints:true,bigText:false};
+const ZOOM_LEVELS=[0.5,0.65,0.8,1,1.25,1.5,1.75,2];
+const DEFAULT_SETTINGS={master:0.7,music:0,sfx:0.65,amb:0.3,muted:false,anim:true,zoom:1,touch:'auto',hints:true,bigText:false,audioVersion:2};
 let screens={},canvas=null,sideTab='gear',modalStack=[],target=null,walking=null,lastZone=null,lastEnemyCount=0,refreshQueued=false;
 
 // ============================================================
@@ -31,6 +32,10 @@ function build(){
  const main=el('div','main',g);
  const cw=el('div','canvaswrap',main);cw.id='cw';
  canvas=el('canvas','map',cw);
+ const zoom=el('div','map-zoom',cw);zoom.setAttribute('aria-label','Map zoom');
+ const zout=btn(zoom,'−',()=>changeZoom(-1));zout.id='zoom-out';zout.setAttribute('aria-label','Zoom out');zout.title='Zoom out (− or mouse wheel)';
+ const reset=btn(zoom,'100%',()=>setZoom(1));reset.id='zoom-reset';reset.setAttribute('aria-label','Reset map zoom');reset.title='Reset zoom (0)';
+ const zin=btn(zoom,'+',()=>changeZoom(1));zin.id='zoom-in';zin.setAttribute('aria-label','Zoom in');zin.title='Zoom in (+ or mouse wheel)';
  el('div','threats',cw).id='threats';
  el('div','ctx-btn hidden',cw).id='ctxbtn';
  el('div','tooltip hidden',cw).id='tooltip';
@@ -47,16 +52,21 @@ function build(){
 // ============================================================
 // SETTINGS / META
 // ============================================================
-function loadSettings(){meta=Game.loadMeta();settings=Object.assign({},DEFAULT_SETTINGS,meta.settings||{});applySettings();}
+function loadSettings(){meta=Game.loadMeta();settings=Object.assign({},DEFAULT_SETTINGS,meta.settings||{});
+ if(meta.settings&&meta.settings.audioVersion!==2){if(settings.music===0.45)settings.music=0;if(settings.amb===0.6)settings.amb=0.3;if(settings.sfx===0.8)settings.sfx=0.65;settings.audioVersion=2;meta.settings=settings;Game.saveMeta(meta);}
+ settings.zoom=Number.isFinite(+settings.zoom)?Math.max(0.5,Math.min(2,+settings.zoom)):1;applySettings();}
+function setZoom(value){settings.zoom=Math.max(0.5,Math.min(2,value));Renderer.hover=null;saveSettings();}
+function changeZoom(dir){const z=settings.zoom;const next=dir>0?ZOOM_LEVELS.find(v=>v>z+0.01):ZOOM_LEVELS.slice().reverse().find(v=>v<z-0.01);if(next!==undefined)setZoom(next);}
 function saveSettings(){meta=Game.loadMeta();meta.settings=settings;Game.saveMeta(meta);applySettings();}
 function applySettings(){Object.assign(Sound.vol,{master:settings.master,music:settings.music,sfx:settings.sfx,amb:settings.amb});Sound.muted=settings.muted;Sound.applyVol();
  Renderer.anim=settings.anim?1:0;Renderer.zoom=settings.zoom;document.body.classList.toggle('bigtext',!!settings.bigText);
- const showTouch=settings.touch==='on'||(settings.touch==='auto'&&isTouch);document.body.classList.toggle('show-touch',showTouch);resize();}
+ const showTouch=settings.touch==='on'||(settings.touch==='auto'&&isTouch);document.body.classList.toggle('show-touch',showTouch);
+ if($('#zoom-reset')){$('#zoom-reset').textContent=Math.round(settings.zoom*100)+'%';$('#zoom-out').disabled=settings.zoom<=0.5;$('#zoom-in').disabled=settings.zoom>=2;}resize();}
 
 // ============================================================
 // TITLE
 // ============================================================
-function show(name){for(const k in screens)screens[k].classList.toggle('hidden',k!==name);if(name==='game'){resize();}}
+function show(name){for(const k in screens)screens[k].classList.toggle('hidden',k!==name);Sound.setActive(name==='game');if(name==='game'){resize();}}
 function showTitle(){
  loadSettings();if($('#toasts'))clearToasts();show('title');const t=screens.title;clear(t);
  t.style.backgroundImage=`url(${window.ASSETS.title})`;
@@ -66,7 +76,8 @@ function showTitle(){
  el('h1',null,box,'NIGHT RUN');
  el('div','title-tag',box,'One person. One city. It already knows your name.');
  const btns=el('div','title-btns',box);
- if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast('Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
+ btn(btns,'Import save',()=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=async()=>{const file=input.files[0];if(!file)return;try{if(Game.load(await file.text())){Game.save();Sound.start();enterGame();}else toast(Game.loadError||'Invalid save.','#f66');}catch(e){toast('Could not read that save.','#f66');}};input.click();});
+ if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast(Game.loadError||'Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
  btn(btns,'New Run',()=>{Sound.start();if(Game.hasSave())confirmBox('Starting a new run abandons your current one. The city will not remember you.',()=>{Game.clearSave();showCreate();});else showCreate();},Game.hasSave()?'':'primary');
  btn(btns,'Codex',()=>{Sound.start();showCodex();});
  btn(btns,'Past Runs',()=>{Sound.start();showRuns();});
@@ -265,6 +276,11 @@ function paneAbil(pane){
  for(const [k,lab,fn] of [['R','Reload',()=>Game.reload()],['F','Fire at target',startFire],['T','Throw…',throwMenu],['Z','Rest (wait 10 turns)',rest],['X','Examine',()=>startLook()],['E','Interact / context',contextAction]]){const r=el('div','card-row',pane,`<b>[${k}]</b> ${lab}`);r.onclick=()=>{$('#side').classList.remove('open');fn();refresh();};}
 }
 function paneQuest(pane){
+ el('div','sec',pane,'Your refuge - Last Light');
+ el('div','small',pane,'Use a bed at the Last Light in Ashgrove to access your locker, rest, or build a workbench. Stored items stay here for this run.');
+ if(Game.atRefuge())el('button','btn',pane,'Open refuge').onclick=()=>Game.refugeMenu();
+
+ if(G.quests.boat){el('div','sec',pane,'Boat preparations');for(const step of Game.boatChecklist())el('div','small',pane,(step.done?'Ready: ':'Needed: ')+step.text);if(Game.boatSite())el('button','btn',pane,'Work on the boat').onclick=()=>Game.boat();}
  const ids=Object.keys(G.quests);
  const act=ids.filter(i=>G.quests[i].state==='active'),done=ids.filter(i=>G.quests[i].state!=='active');
  if(!ids.length)el('div','muted',pane,'No leads yet. People talk. Listen.');
@@ -412,6 +428,7 @@ const UI={
    case 'glitch':Sound.play('echo');break;case 'levelup':Sound.play('level');toast('Level up! Spend your points in Character (C).','#ffe27a');break;case 'quest':Sound.play('quest');break;
    case 'zone':Sound.play('zone');break;case 'reload':Sound.play('reload');break;case 'shake':Sound.play('boom');break;}},
  confirm(text,yes){confirmBox(text,yes);},
+ clearNotifications(){clearToasts();},
  choice(text,opts){modal(box=>{el('div','mtext',box,esc(text));const o=el('div','opts',box);for(const op of opts){if(op.cond&&!op.cond())continue;const b=el('button','opt',o,esc(op.t));b.onclick=()=>{closeModal();op.f&&op.f();refresh();};}},{noClose:true});},
  openLoot(c,x,y){const draw=()=>{if(!c.items.length){closeModal();refresh();return;}modal(box=>{el('h3',null,box,esc(c.kind[0].toUpperCase()+c.kind.slice(1)));el('div','muted small',box,`Pack ${Game.totalWeight()} / ${G.p.d.carry} kg`);
    const o=el('div','loot',box);for(const it of c.items.slice()){const d=ITEMS[it.id];const r=el('div','loot-row',o,`${icon(it.id,28)}<div class="grow"><b style="color:${d.col}">${esc(Game.itemName(it))}</b><div class="muted small">${esc(d.desc)}</div></div><span class="muted small">${(d.wt*(it.qty||1)).toFixed(1)}kg</span>`);r.onclick=()=>{if(Game.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}draw();};}
@@ -471,7 +488,7 @@ function epitaph(s){if(s.days<=1)return 'The city barely noticed.';if(s.attentio
 // PAUSE / SETTINGS / HELP / CODEX / RUNS
 // ============================================================
 function pauseMenu(){modal(box=>{el('h3',null,box,'Paused');el('div','muted small',box,`${esc(G.p.name)} · Day ${G.day} ${Game.timeStr()} · ${esc(G.zone.name)}`);const o=el('div','opts',box);
- const items=[['Resume',()=>{}],['Save',()=>{Game.save();toast('Saved.','#8f8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{Game.save();showTitle();}]];
+ const items=[['Resume',()=>{}],['Save',()=>{toast(Game.save()?'Saved.':'Save failed. Export a backup from Settings.','#fd8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{if(Game.save())showTitle();else toast('Save failed. Export a backup from Settings before quitting.','#f66');}]];
  for(const [l,f] of items){const b=el('button','opt',o,l);b.onclick=()=>{closeModal();f();};}});}
 function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const sl=(lab,key)=>{const r=el('div','set-row',box);el('span',null,r,lab);const i=el('input',null,r);i.type='range';i.min=0;i.max=1;i.step=0.05;i.value=settings[key];i.oninput=()=>{settings[key]=+i.value;saveSettings();};};
@@ -479,7 +496,9 @@ function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const tg=(lab,key)=>{const r=el('div','set-row',box);el('span',null,r,lab);const i=el('input',null,r);i.type='checkbox';i.checked=!!settings[key];i.onchange=()=>{settings[key]=i.checked;saveSettings();};};
  tg('Mute all','muted');tg('Animations & screen effects','anim');tg('Tutorial hints','hints');tg('Larger text','bigText');
  const sel=(lab,key,opts)=>{const r=el('div','set-row',box);el('span',null,r,lab);const s=el('select',null,r);for(const [v,t] of opts){const o=el('option',null,s,t);o.value=v;if(String(settings[key])===String(v))o.selected=true;}s.onchange=()=>{settings[key]=isNaN(+s.value)?s.value:+s.value;saveSettings();};};
- sel('Map zoom','zoom',[[0.8,'Far'],[1,'Normal'],[1.25,'Close'],[1.5,'Closest']]);sel('Touch controls','touch',[['auto','Auto'],['on','Always'],['off','Never']]);
+ sel('Map zoom','zoom',ZOOM_LEVELS.map(v=>[v,Math.round(v*100)+'%']));sel('Touch controls','touch',[['auto','Auto'],['on','Always'],['off','Never']]);
+ el('div','small muted',box,'Music is optional and off by default. Ambience uses quiet environmental textures.');
+ if(G&&!G.dead&&!G.ending){const download=el('button','opt',box,'Export save backup');download.onclick=()=>{const url=URL.createObjectURL(new Blob([Game.exportSave()],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='nightrun-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
  const r=el('div','opts',box);const b=el('button','opt',r,'Reset hints');b.onclick=()=>{meta=Game.loadMeta();meta.hints={};Game.saveMeta(meta);toast('Hints will show again.','#8f8');};
  if(G&&!screens.game.classList.contains('hidden')){}else{const bk=el('button','opt',r,'Back');bk.onclick=()=>{closeModal();};}});}
 function showHelp(){modal(box=>{el('h3',null,box,'How to survive');box.insertAdjacentHTML('beforeend',`
@@ -490,6 +509,7 @@ function showHelp(){modal(box=>{el('h3',null,box,'How to survive');box.insertAdj
 <div><b>1 2 3</b> abilities · <b>. / 5 / Space</b> wait · <b>Z</b> rest 10 turns · <b>X</b> examine</div>
 <div><b>I C H Q P M</b> gear, character, abilities, quests, factions (P), city map · <b>K</b> craft (Pickers) · <b>Esc</b> menu</div>
 <div><b>Touch</b> pad to move, the gold button does the obvious thing, long-press to examine.</div>
+<div><b>Zoom</b> map −/+ buttons · mouse wheel over the map · +/− keys · 0 resets. Your zoom is saved.</div>
 <hr>
 <p><b>Time</b> passes with every action. Night (20:00–06:00) cuts your sight, brings out ghouls and worse, and closes vendors — but night caches appear and patrols thin out.</p>
 <p><b>Injuries</b> outlast the fight. Bleeding needs bandages, fractures a splint, infection antibiotics. Hunger and fatigue are slow but real: eat, and sleep in beds — safe beds are in faction buildings.</p>
@@ -547,6 +567,7 @@ function onKey(ev){
   if(k==='g'){const a=$('#modal .opt.primary');if(a)a.click();}
   return;}
  if(G.dead||G.ending)return;
+ if(!ev.ctrlKey&&!ev.metaKey&&['+','=','-','_','0'].includes(k)){if(k==='0')setZoom(1);else changeZoom(k==='+'||k==='='?1:-1);ev.preventDefault();return;}
  let mv=MOVE[code]||MOVE[k];if(ev.key&&/^[1-9]$/.test(ev.key)&&code&&code.startsWith('Numpad'))mv=MOVE[code];
  if(target){if(k==='Escape'){cancelTarget();ev.preventDefault();return;}if(k==='Enter'||k==='f'||k===' '){confirmTarget();ev.preventDefault();return;}if(k==='Tab'){moveCursor(1,0);ev.preventDefault();return;}if(mv){moveCursor(mv[0],mv[1]);ev.preventDefault();return;}return;}
  if(mv){doMove(mv[0],mv[1]);ev.preventDefault();return;}
@@ -562,6 +583,8 @@ function onKey(ev){
 function openTab(t){sideTab=t;$('#side').classList.add('open');renderSide();}
 function wire(){
  window.addEventListener('keydown',onKey);
+ let lastZoomWheel=0;
+ canvas.addEventListener('wheel',ev=>{if(modalOpen()||ev.ctrlKey||ev.metaKey||!ev.deltaY)return;ev.preventDefault();const now=performance.now();if(now-lastZoomWheel<90)return;lastZoomWheel=now;changeZoom(ev.deltaY<0?1:-1);},{passive:false});
  canvas.addEventListener('mousemove',ev=>{if(!G)return;const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(ev.clientX-r.left,ev.clientY-r.top);Renderer.hover=t;
   if(target&&target.mode==='tile'&&Game.dist(t.x,t.y,G.p.x,G.p.y)<=target.range){target.cursor={x:t.x,y:t.y};Renderer.targets=[target.cursor];}
   const d=describeTile(t.x,t.y);if(d&&!target)showTip(d,{x:ev.clientX,y:ev.clientY});});
@@ -570,7 +593,7 @@ function wire(){
  canvas.addEventListener('pointerdown',ev=>{Sound.start();Sound.resume();press={x:ev.clientX,y:ev.clientY,t:performance.now(),long:false};if(ev.pointerType==='touch'){press.timer=setTimeout(()=>{press.long=true;const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(ev.clientX-r.left,ev.clientY-r.top);Renderer.hover=t;showTip(describeTile(t.x,t.y),{x:ev.clientX,y:ev.clientY},true);},450);}});
  canvas.addEventListener('pointerup',ev=>{if(!press)return;clearTimeout(press.timer);const long=press.long;press=null;if(long)return;tapAt(ev.clientX,ev.clientY);});
  canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(ev.clientX-r.left,ev.clientY-r.top);showTip(describeTile(t.x,t.y),{x:ev.clientX,y:ev.clientY},true);});
- document.addEventListener('visibilitychange',()=>{if(document.hidden&&G&&!G.dead&&!G.ending)Game.save();});
+ document.addEventListener('visibilitychange',()=>{Sound.setActive(!document.hidden&&!screens.game.classList.contains('hidden'));if(document.hidden&&G&&!G.dead&&!G.ending)Game.save();});
  window.addEventListener('beforeunload',()=>{if(G&&!G.dead&&!G.ending)Game.save();});
 }
 function tapAt(cx,cy){if(!G||modalOpen()||G.dead||G.ending)return;const r=canvas.getBoundingClientRect();const t=Renderer.screenToTile(cx-r.left,cy-r.top);
@@ -599,6 +622,9 @@ function buildTouch(){const t=$('#touch');clear(t);const pad=el('div','pad',t);
 // CSS
 // ============================================================
 const CSS=`
+.map-zoom{position:absolute;top:12px;right:12px;z-index:8;display:flex;gap:4px;padding:4px;border:1px solid #494553;border-radius:8px;background:#101017eb}
+.map-zoom .btn{min-width:38px;min-height:38px;padding:6px 9px;font-size:15px;touch-action:manipulation}
+.map-zoom #zoom-reset{min-width:64px;font-size:12px}
 @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
 :root{--bg:#07070a;--panel:#0f0f14;--panel2:#15151c;--line:#26262f;--text:#d8d6d0;--muted:#8a8894;--gold:#ffe27a;--red:#ff5a5a;--font:'IBM Plex Mono','Courier New',monospace;--pix:'Silkscreen','Courier New',monospace}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}

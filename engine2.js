@@ -7,20 +7,23 @@ Object.assign(Game,{
  // ---------- combat core ----------
  // attacker/defender: 'P' for player or an entity
  combatStats(a){if(a==='P'){const p=G.p,d=p.d,w=this.weaponDef();return{name:p.name,hitBonus:(w.ranged?d.hitR+this.skill('firearms')*4+d.stats.per*2:d.hitM+this.skill('melee')*4+d.stats.agi*2),evade:d.evade,arm:d.arm,crit:d.crit,isP:1,w};}
-  const d=ENEMIES[a.def];return{name:a.name,hitBonus:d.hit+10,evade:d.evade+(a.st.jammed?-3:0),arm:d.arm,crit:3,isP:0,w:{dmg:d.dmg,ranged:d.ranged,props:d.props||[]}};},
+  const d=this.entityCombatDef(a);return{name:a.name,hitBonus:d.hit+10,evade:d.evade+(a.st.jammed?-3:0),arm:d.arm,crit:3,isP:0,w:{dmg:d.dmg,ranged:d.ranged,props:d.props||[]}};},
+ entityCombatDef(e){return e.kind==='npc'?{hit:0,evade:2,arm:0,dmg:[3,8],tags:['human'],ai:[],props:[]}:ENEMIES[e.def];},
  posOf(a){return a==='P'?[G.p.x,G.p.y]:[a.x,a.y];},
  attack(att,def,opts){opts=opts||{};const A=this.combatStats(att),D=this.combatStats(def);const [ax,ay]=this.posOf(att),[dx,dy]=this.posOf(def);const dist=this.dist(ax,ay,dx,dy);const w=opts.w||A.w;const ranged=!!w.ranged&&!opts.melee;
   let chance=55+A.hitBonus-D.evade*3;
   if(ranged){chance-=Math.max(0,dist-3)*3;if(w.closeBonus&&dist<=2)chance+=15;if(w.scoped&&dist>=5)chance+=10;if(this.coverBetween(ax,ay,dx,dy))chance-=20;}
-  const night=this.isNight();const litT=G.zone.lit&&G.zone.lit[dy*G.zone.w+dx];if(night&&!litT){chance-=A.isP?(G.p.d.visionNight>6?0:10):(ENEMIES[att.def].tags.includes('creature')||ENEMIES[att.def].ai.includes('night')?0:10);}
+  const enemyDef=A.isP?null:this.entityCombatDef(att);
+  const aimed=A.isP&&ranged&&this.hasStatus('aim');
+  const night=this.isNight();const litT=G.zone.lit&&G.zone.lit[dy*G.zone.w+dx];if(night&&!litT){chance-=A.isP?(G.p.d.visionNight>6?0:10):(enemyDef.tags.includes('creature')||enemyDef.ai.includes('night')?0:10);}
   if(G.rain)chance-=5;
-  if(A.isP){if(this.hasStatus('aim')){chance+=30;this.removeStatus('aim');}if(w.mods&&w.mods.includes('scope'))chance+=10;if(this.hasStatus('hidden')||opts.ambush)chance+=25;}
+  if(A.isP){if(aimed){chance+=30;this.removeStatus('aim');}if(ranged&&G.p.eq.weapon?.mods?.includes('scope'))chance+=10;if(this.hasStatus('hidden')||opts.ambush)chance+=25;}
   else{if(att.st.jammed)chance-=30;if(att.st.fear)chance-=15;if(this.hasStatus('hidden')&&!opts.ambush)chance-=25;// surround bonus for flankers
-   if(ENEMIES[att.def].ai.includes('flank')&&def==='P'){let allies=0;for(const e of G.zone.ents)if(e!==att&&e.kind==='e'&&this.isHostile(e)&&this.dist(e.x,e.y,dx,dy)<=1)allies++;if(allies)chance+=12;}}
+   if(enemyDef.ai.includes('flank')&&def==='P'){let allies=0;for(const e of G.zone.ents)if(e!==att&&e.kind==='e'&&this.isHostile(e)&&this.dist(e.x,e.y,dx,dy)<=1)allies++;if(allies)chance+=12;}}
   chance=this.clamp(chance,5,97);
   const r=this.ri(1,100);const hit=r<=chance;
   if(!hit){this.log(`${A.name} ${ranged?'fires at':'swings at'} ${D.name} and misses.`,A.isP?'#aaa':'#ccc');this.fx(ranged?'shot':'miss',{x:dx,y:dy,fx:ax,fy:ay,miss:1});if(!ranged)this.fx('whiff',{x:dx,y:dy});return {hit:false};}
-  let crit=r<=A.crit+(A.isP&&this.hasStatus('aim')?20:0)||(A.isP&&opts.ambush&&this.fxf('ambushCrit'));
+  let crit=r<=A.crit+(aimed?20:0)||(A.isP&&opts.ambush&&this.fxf('ambushCrit'));
   let dmg=this.ri(w.dmg[0],w.dmg[1]);
   if(A.isP){const d=G.p.d;dmg+=ranged?Math.floor(d.stats.per/3):Math.floor(d.stats.str/2)+d.dmgM;if(ranged&&w.ammo==='rifle'&&d.flags.rifleDmg)dmg+=d.flags.rifleDmg;if(opts.ambush||this.hasStatus('hidden'))dmg=Math.round(dmg*(d.ambush>1?d.ambush:1.5));if(opts.burst)dmg=Math.round(dmg*(1+0.3*(opts.burst-1)));}
   else if(att.def==='echo_shade'){const pw=this.weaponDef();dmg=Math.max(dmg,this.ri(pw.dmg[0],pw.dmg[1])+2);}
@@ -33,7 +36,7 @@ Object.assign(Game,{
    if(props.includes('stun')&&this.chance(0.2)&&!G.p.d.immune.includes('stun')){this.addStatus('stun',1);this.log('You are stunned!','#ff0');}
    if(props.includes('poison')&&this.chance(0.35)&&!G.p.d.immune.includes('poison')){this.addStatus('poison',20);this.log('Poison burns in the wound.','#8f4');}
    if(crit){const inj=this.rc(['fracture','concussion','bleed','infection']);if(!G.p.d.immune.includes(inj)){this.addStatus(inj,inj==='bleed'?8:inj==='infection'?300:120);this.log(`${STATUSES[inj].n}!`,'#f44');}}
-   if(att.def&&ENEMIES[att.def].tags.includes('chromed')&&this.chance(0.1)&&G.p.chrome.length)this.addStatus('malfunction',10),this.log('The hit rattles your chrome.','#f6f');
+   if(enemyDef.tags.includes('chromed')&&this.chance(0.1)&&G.p.chrome.length)this.addStatus('malfunction',10),this.log('The hit rattles your chrome.','#f6f');
    // armor durability
    const body=G.p.eq.body;if(body&&body.dur!==undefined&&this.chance(0.3)){body.dur--;if(body.dur===0){this.log(`Your ${ITEMS[body.id].name} is falling apart.`,'#f66');this.computeDerived();}}
    this.dmgPlayer(final,A.name);}
@@ -48,7 +51,7 @@ Object.assign(Game,{
  damage(e,n,src,by){if(e.shield&&e.shield>0){const s=Math.min(e.shield,n);e.shield-=s;n-=s;e.shieldCd=3;if(n<=0){this.log(`${e.name}'s shield flares.`,'#aef');return;}}
   e.hp-=n;if(e.kind==='npc'&&!e.hostile){e.hostile=1;this.log(`${e.name} is now hostile!`,'#f66');if(e.fac)this.addRep(e.fac,-25);}
   if(e.kind==='e'&&!this.isHostile(e)&&by==='P'&&e.fac!=='ally'){e.hostile=1;this.addRep(e.fac,-8);for(const o of G.zone.ents)if(o.kind==='e'&&o.fac===e.fac&&this.dist(o.x,o.y,e.x,e.y)<=10){o.hostile=1;o.alert=20;o.lastSeen=[G.p.x,G.p.y];}}
-  if(by==='P'||src==='you'){e.alert=25;e.lastSeen=[G.p.x,G.p.y];e.hidden=0;}
+  if(by==='P'||src==='you'){e.hostile=1;e.alert=25;e.lastSeen=[G.p.x,G.p.y];e.hidden=0;}
   if(e.hp<=0)this.kill(e,by);},
  kill(e,by){const z=G.zone;const i=z.ents.indexOf(e);if(i>=0)z.ents.splice(i,1);const d=e.kind==='e'?ENEMIES[e.def]:null;
   if(e.kind==='npc'){G.flags['dead_'+e.def]=1;this.log(`${e.name} is dead.`,'#f66');if(e.fac)this.addRep(e.fac,-30);for(const qid in G.quests){const q=QUESTS[qid];if(q.fac===e.fac&&G.quests[qid].state==='active'&&['wren','tallow','okafor','dace','ives','kesh','cantor','ludo','sable','verity','mags'].includes(e.def)){}}if(e.def==='kesh')this.failQuest('boat');if(e.def==='dace')this.failQuest('power');if(e.def==='wren'){this.failQuest('wren_package');this.failQuest('bad_blood');this.failQuest('the_crown');}if(e.def==='ives')this.failQuest('skyhook');if(e.def==='cantor')this.failQuest('chorus');if(e.def==='sable'){G.flags.purge_done=1;}return;}
@@ -151,11 +154,11 @@ Object.assign(Game,{
   if(!canSee&&this.dist(e.x,e.y,tgt[0],tgt[1])<=1){e.lastSeen=null;if(e.alert>5)e.alert=5;}
   // overwatch
   if(moved&&this.hasStatus('aim')&&this.fxf('overwatch')){const c=this.canFire();if(c.ok&&this.dist(p.x,p.y,e.x,e.y)<=c.w.range&&this.los(p.x,p.y,e.x,e.y)&&this.visible(e.x,e.y)){this.log('Overwatch!','#8f8');p.eq.weapon.clip--;this.attack('P',e,{});}}},
- npcAct(e){if(e.hostile){const p=G.p;const dist=this.dist(e.x,e.y,p.x,p.y);if(dist<=1)this.attack(e,'P',{melee:1,w:{dmg:[3,8],props:[]}});else if(dist<=8)this.stepToward(e,p.x,p.y);return;}if(this.chance(0.1))this.wander(e,[e.x,e.y],1);},
+ npcAct(e){if(e.st.stun||e.st.jammed)return;if(e.hostile){const p=G.p;const dist=this.dist(e.x,e.y,p.x,p.y);if(dist<=1)this.attack(e,'P',{melee:1,w:{dmg:[3,8],props:[]}});else if(dist<=8)this.stepToward(e,p.x,p.y);return;}if(this.chance(0.1))this.wander(e,[e.x,e.y],1);},
  wander(e,home,r){const d=this.rc(DIRS8);const nx=e.x+d[0],ny=e.y+d[1];if(this.walkableFor(nx,ny)&&this.dist(nx,ny,home[0],home[1])<=r&&this.tile(nx,ny)!==T.EXIT&&!this.inSafeDifferent(e,nx,ny)&&TILE_DEFS[this.tile(nx,ny)].h===undefined){e.x=nx;e.y=ny;}},
  inSafeDifferent(e,x,y){const s=this.inSafe(x,y);return s&&e.kind==='e'&&HOSTILE_FACTIONS[e.fac];},
  stepToward(e,tx,ty){const z=G.zone;let best=null,bd=this.dist(e.x,e.y,tx,ty)+0.5,bs=this.edist(e.x,e.y,tx,ty);const dirs=RNG.shuffle(DIRS8.slice());
-  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!ENEMIES[e.def].tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
+  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!this.entityCombatDef(e).tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
   if(!best){// try BFS a few steps for corners
    const path=this.bfs(e.x,e.y,tx,ty,e);if(path&&path.length>1){best=path[1];}}
   if(!best)return false;const t=this.tile(best[0],best[1]);if(t===T.DOOR){Gen.set(z,best[0],best[1],T.DOOR_OPEN);return true;}e.x=best[0];e.y=best[1];return true;},
@@ -191,33 +194,64 @@ Object.assign(Game,{
   return false;},
 
  // ---------- escape routes ----------
- helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('You work for an hour. The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
+ helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
   const warden=G.zone.ents.find(e=>e.def==='warden'&&e.hp>0);if(warden&&this.dist(warden.x,warden.y,p.x,p.y)<=8&&!G.flags.heli_access){this.log('Warden Sol stands between you and the cockpit.','#f66');return;}
   if(u)u.confirm('Fly out of the city? This ends the run.',()=>this.endRun('skyhook'));},
- boat(){const u=this.ui();if(!G.quests.boat)this.startQuest('boat');if(!G.flags.boat_parts){this.log('Kesh\'s boat. No motor. Talk to Kesh.','#db8');return;}if(!G.flags.channel_clear){this.log('The channel is thick with the Drowned. Kesh won\'t push off. Kill the Bloat Mother or make peace with them (+20).','#dbe');return;}if(u)u.confirm('Push off down the river? This ends the run.',()=>this.endRun('openwater'));},
+
  train(){const u=this.ui();if(!G.flags.train_powered){this.log('A dead train car. The switch on the platform controls it.','#8fa0b8');return;}if(u)u.confirm('Board the last train? This ends the run.',()=>this.endRun('lasttrain'));},
  heart(){const u=this.ui();if(!this.hasItem('shard',3)){this.log('The Heart pulses. It is waiting for three pieces of itself.','#fff');return;}this.attention(10);
   if(u)u.choice('The Heart opens like a pupil. In it, the city from inside its own skull. Every camera. Every name. Yours, already there, already old.\n\n> ONE QUESTION. ONLY ONCE. WILL YOU STAY WITH ME?',[{t:'Yes.',f:()=>this.endRun('answer')},{t:'No.',f:()=>this.endRun('refuse')},{t:'(step back — you are not ready)',f:()=>{}}]);},
 
  // ---------- death & endings ----------
- die(cause){const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
- endRun(id){if(G.ending)return;G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
+ die(cause){if(G.dead||G.ending)return;const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
+ endRun(id){if(G.dead||G.ending)return;const quest={openwater:'boat',skyhook:'skyhook',lasttrain:'power',answer:'chorus',refuse:'chorus'}[id];if(quest){this.startQuest(quest);this.completeQuest(quest);}G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
  finishRun(id){const p=G.p;const summary={name:p.name,cls:CLASSES[p.cls].name,spec:p.spec?SPECS[p.spec].name:null,level:p.level,days:G.day,turns:G.turn,kills:p.kills,zones:p.zonesSeen.length,quests:Object.values(G.quests).filter(q=>q.state==='done').length,ending:id,endingName:ENDINGS[id].name,cause:G.cause,chrome:p.chrome.map(c=>ITEMS[c].name),flesh:p.flesh.map(c=>ITEMS[c].name),attention:G.attention,date:Date.now(),rep:Object.assign({},G.rep),escaped:!!ENDINGS[id].escape};
   const meta=this.loadMeta();meta.runs.unshift(summary);if(meta.runs.length>30)meta.runs.length=30;
   const unl=[];if(!meta.unlocks.listener&&(G.attention>=25||G.flags.echo_seen||G.flags.static_seen)){meta.unlocks.listener=1;unl.push('Class unlocked: Listener — you heard it. Next time, you can start already listening.');}
   for(const k of ['echo','chrome','flesh','nightrun','escape']){const cond=k==='echo'?G.flags.echo_seen:k==='chrome'?p.chrome.length:k==='flesh'?p.flesh.length:k==='nightrun'?G.day>=2:(G.quests.skyhook||G.quests.boat||G.quests.power||G.quests.chorus);if(cond&&!meta.codex[k]){meta.codex[k]=1;unl.push('Codex: '+CODEX[k].name);}}
   if(ENDINGS[id].escape&&!meta.unlocks.hardmode){meta.unlocks.hardmode=1;unl.push('Unlocked: Night Mode (start at night, more of everything).');}
   meta.endings=meta.endings||{};meta.endings[id]=(meta.endings[id]||0)+1;
-  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,ENDINGS[id]);},
+  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,this.endingDetails(id));},
+
+ // ---------- campaign milestones and refuge ----------
+ awardMilestone(id,xp,label){G.milestones=G.milestones||{};if(G.milestones[id])return false;G.milestones[id]=1;this.giveXp(xp);this.log(`${label}: +${xp} XP.`,'#8fd');return true;},
+ atRefuge(){return !!(G&&!G.dead&&!G.ending&&G.zoneId==='ashgrove'&&this.buildingAt(G.p.x,G.p.y)?.prefab==='bar'&&this.inSafe(G.p.x,G.p.y));},
+ refugeState(){return G.refuge||(G.refuge={stash:[],workbench:false});},
+ refugeTransfer(inst,take){if(!this.atRefuge())return false;const r=this.refugeState(),src=take?r.stash:G.p.inv;if(!src.includes(inst))return false;if(!take&&ITEMS[inst.id].noDrop)return false;
+  if(take){if(!this.addItemChecked({...inst,mods:inst.mods&&inst.mods.slice()}))return false;src.splice(src.indexOf(inst),1);}else{src.splice(src.indexOf(inst),1);r.stash.push(inst);this.log(`Stored ${this.itemName(inst)} at the Last Light.`,'#8fd');this.computeDerived();}this.save();return true;},
+ buildRefugeBench(){if(!this.atRefuge()||this.refugeState().workbench)return false;if(this.countItem('scrap')<8||this.countItem('electronics')<2){this.log('Need 8 scrap and 2 electronics in your pack.','#fd8');return false;}this.removeItem('scrap',8);this.removeItem('electronics',2);this.refugeState().workbench=true;this.awardMilestone('refuge:bench',50,'Last Light workbench completed');this.log('A working bench. One more reason to come home.','#8fd');this.save();return true;},
+ refugeMenu(x,y){if(!this.atRefuge())return;const u=this.ui();if(!u)return;const r=this.refugeState();const bed=G.zone.t.findIndex((t,i)=>t===T.BED&&this.buildingAt(i%G.zone.w,Math.floor(i/G.zone.w))?.prefab==='bar');
+  const opts=[{t:`Store supplies (${G.p.inv.length} carried stacks)`,f:()=>this.refugeInventory(false)},{t:`Retrieve supplies (${r.stash.length} stored stacks)`,f:()=>this.refugeInventory(true)}];
+  if(bed>=0)opts.push({t:'Rest - normal bed fees apply',f:()=>this.sleepPrompt(bed%G.zone.w,Math.floor(bed/G.zone.w),true)});
+  if(r.workbench)opts.push({t:'Use your workbench',f:()=>u.openCraft()});else opts.push({t:'Build workbench - 8 scrap + 2 electronics (50 XP)',f:()=>{this.buildRefugeBench();this.refugeMenu();}});
+  if(r.infirmary)opts.push({t:'Treatment corner - 1 Bandage, up to 20 HP + stop bleeding, once per day',f:()=>{this.refugeTreatment();this.refugeMenu();}});else opts.push({t:'Build treatment corner - workbench + 6 Cloth + 2 Chemicals + 4 Scrap',f:()=>{this.buildRefugeInfirmary();this.refugeMenu();}});
+  opts.push({t:'Head back out',f:()=>{}});u.choice('THE LAST LIGHT\nYour locker is free. Supplies and projects persist for this character. Withdraw materials before crafting.\nNext lead: Mags knows the neighborhood; Wren at Saints Hall needs a package recovered.',opts);},
+ refugeInventory(take){if(!this.atRefuge())return;const list=take?this.refugeState().stash:G.p.inv;this.ui().choice(take?'Your locker - take a whole stack':'Your pack - store a whole stack',list.filter(it=>take||!ITEMS[it.id].noDrop).map(it=>({t:this.itemName(it),f:()=>{this.refugeTransfer(it,take);this.refugeInventory(take);}})).concat([{t:'Back to refuge',f:()=>this.refugeMenu()}]));},
 
  // ---------- save / load ----------
  storage(){try{if(typeof localStorage!=='undefined')return localStorage;}catch(e){}return null;},
- serialize(){G.rngs=RNG.s;const z=G.zone;G.zone=null;const s=JSON.stringify(G,(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);G.zone=z;return s;},
- save(){if(!G||G.dead||G.ending)return;try{const st=this.storage();if(st)st.setItem('nr_save',this.serialize());}catch(e){}},
+ serialize(){return JSON.stringify({...G,saveVersion:3,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
+ save(){if(!G||G.dead||G.ending)return false;try{const st=this.storage();if(!st)throw Error('Storage unavailable');const next=this.serialize(),old=st.getItem('nr_save');if(old){try{this.validateSave(JSON.parse(old));st.setItem('nr_save_backup',old);}catch(e){}}st.setItem('nr_save',next);return true;}catch(e){this.log('Could not save on this device. Export your save from Settings.','#f66');return false;}},
  exportSave(){return this.serialize();},
- load(str){try{const st=this.storage();const s=str||(st&&st.getItem('nr_save'));if(!s)return false;const g=JSON.parse(s);if(!g||!g.p)return false;G=g;RNG.seed(G.rngs||G.seed);RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];G.zone.def=ZONES[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();return true;}catch(e){console.error(e);return false;}},
- hasSave(){const st=this.storage();return !!(st&&st.getItem('nr_save'));},
- clearSave(){try{const st=this.storage();if(st)st.removeItem('nr_save');}catch(e){}},
+ validateSave(g){
+  if(!g||!g.p||!CLASSES[g.p.cls]||!g.zones||!ZONES[g.zoneId]||!g.zones[g.zoneId])throw Error('Incomplete save');
+  if((g.saveVersion||1)>3)throw Error('This save needs a newer game version');
+  for(const k of ['inv','statuses','talents','chrome','flesh','zonesSeen'])if(!Array.isArray(g.p[k]))throw Error('Invalid player data');
+  for(const k of ['hp','xp','level','x','y'])if(!Number.isFinite(g.p[k]))throw Error('Invalid player numbers');
+  for(const z of Object.values(g.zones)){if(!ZONES[z.id]||!Number.isInteger(z.w)||!Number.isInteger(z.h)||z.w<1||z.h<1||!Array.isArray(z.t)||z.t.length!==z.w*z.h||z.t.some(t=>!TILE_DEFS[t]))throw Error('Invalid district');for(const k of ['ents','items','objs','seen','buildings','exits'])if(!Array.isArray(z[k]))throw Error('Incomplete district');}
+  const z=g.zones[g.zoneId];if(g.p.x<0||g.p.y<0||g.p.x>=z.w||g.p.y>=z.h)throw Error('Invalid position');
+  g.saveVersion=3;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  if(g.boatCampaign&&['hull','motor','fuel','supplies','bypass'].some(k=>typeof g.boatCampaign[k]!=='boolean'))throw Error('Invalid boat project data');
+  if(!Array.isArray(g.refuge.stash)||!g.p.eq||!g.flags||!g.quests||!g.rep)throw Error('Incomplete campaign data');
+  for(const it of [...g.p.inv,...Object.values(g.p.eq).filter(Boolean),...g.refuge.stash])if(!it||!ITEMS[it.id]||!Number.isFinite(it.qty)||it.qty<1)throw Error('Invalid saved item');
+  return g;
+ },
+ load(str){const previous=G,rs=RNG.s;this.loadError='';const st=this.storage();let candidates;
+  try{candidates=str!==undefined?[str]:[st&&st.getItem('nr_save'),st&&st.getItem('nr_save_backup')];}catch(e){this.loadError='Device storage is unavailable.';return false;}
+  for(let i=0;i<candidates.length;i++){if(!candidates[i])continue;try{const g=this.validateSave(JSON.parse(candidates[i]));G=g;RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();if(i>0)this.log('Recovered the previous autosave. Your most recent actions may be missing.','#fd8');return true;}catch(e){G=previous;RNG.s=rs;this.loadError=e.message;}}
+  return false;},
+ hasSave(){try{const st=this.storage();return !!(st&&(st.getItem('nr_save')||st.getItem('nr_save_backup')));}catch(e){return false;}},
+ clearSave(){try{const st=this.storage();if(st){st.removeItem('nr_save');st.removeItem('nr_save_backup');}}catch(e){}},
  loadMeta(){try{const st=this.storage();const s=st&&st.getItem('nr_meta');if(s)return Object.assign({runs:[],unlocks:{},codex:{},settings:{}},JSON.parse(s));}catch(e){}return{runs:[],unlocks:{},codex:{},settings:{}};},
  saveMeta(m){try{const st=this.storage();if(st)st.setItem('nr_meta',JSON.stringify(m));}catch(e){}}
 });
