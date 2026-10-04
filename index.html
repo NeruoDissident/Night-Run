@@ -632,7 +632,7 @@ const CODEX={
 // ---------- QUESTS ----------
 // stages: [{text, done(g)}]  reward applied on final completion. hidden quests start via flags.
 const QUESTS={
- first_steps:{name:'A Foothold',fac:'saints',desc:'Start at the Last Light. Mags has local leads; Wren at Saints Hall offers work. Your locker is available through the beds.',stages:[{text:'Talk to Mags at the Last Light.',done:g=>g.flags.met_mags},{text:'Recover Wren\'s package from Delmar Apartments and return it to Wren at Saints Hall.',done:g=>g.flags.wren_package_done}],reward:{xp:40}},
+ first_steps:{name:'A Foothold',fac:'saints',desc:'Start at the Last Light. Mags has local leads; Wren at Saints Hall offers work. Your locker is available through the beds.',stages:[{text:'Talk to Mags at the Last Light.',done:g=>g.flags.greeted_mags||g.flags.met_mags},{text:'Recover Wren\'s package from Delmar Apartments and return it to Wren at Saints Hall.',done:g=>g.flags.wren_package_done}],reward:{xp:40}},
  wren_package:{name:"Wren's Package",fac:'saints',desc:'Wren wants a package back from the Delmar Apartments stash. Scavs moved in after the Saints moved out.',
   stages:[{text:'Recover the package from the Delmar Apartments (Ashgrove).',done:g=>Game.hasItem('wren_package')},{text:'Bring it to Wren at Saints Hall.',done:g=>G.flags.wren_package_done}],
   reward:{xp:80,creds:60,rep:{saints:20}}},
@@ -655,9 +655,9 @@ const QUESTS={
  dossier:{name:'The Dossier',fac:'halcyon',desc:'Director Ives wants the Union\'s dossier: routes, caches, names. It\'s in a locked room in the Union Hall.',
   stages:[{text:'Get the Union Dossier from Foundry Union Hall (Verge).',done:g=>Game.hasItem('dossier')||G.flags.dossier_burned},{text:'Deliver it to Ives — or burn it and tell Dace.',done:g=>G.flags.dossier_done||G.flags.dossier_burned}],reward:{xp:150,creds:200,rep:{halcyon:30}}},
  skyhook:{name:'Skyhook',fac:'halcyon',desc:'There is a helicopter on Halcyon Tower\'s rooftop hangar. It needs a tail rotor (Verge Machine Works), aviation fuel (Fuel Depot at the docks, or the Tower), and a way onto the roof: Halcyon clearance, a keycard, a hack, or a breach charge.',
-  stages:[{text:'Acquire a Rotor Assembly and Aviation Fuel.',done:g=>Game.hasItem('rotor')&&Game.hasItem('avgas')},{text:'Reach the Rooftop Hangar (Carbon Heights) and repair the helicopter.',done:g=>G.flags.heli_ready},{text:'Fly.',done:g=>false}],reward:{xp:100}},
- boat:{name:"Kesh's Boat",fac:null,desc:'Old Kesh has a boat and no motor. Outboards were made at Verge Machine Works; one sits in the Flooded Warehouse at the docks, under the Bloat Mother. Kesh needs fuel too, and the channel clear — the Drowned or the Mother.',
-  stages:[{text:'Bring Kesh an Outboard Motor and 2 Fuel Cans.',done:g=>G.flags.boat_parts},{text:'Clear the channel: kill the Bloat Mother, or reach +20 with the Drowned.',done:g=>G.flags.channel_clear},{text:'Push off from the pier at Kesh\'s.',done:g=>false}],reward:{xp:100}},
+  stages:[{text:'Acquire a Rotor Assembly and Aviation Fuel.',done:g=>g.flags.heli_ready||(Game.hasItem('rotor')&&Game.hasItem('avgas'))},{text:'Reach the Rooftop Hangar (Carbon Heights) and repair the helicopter.',done:g=>G.flags.heli_ready},{text:'Fly.',done:g=>false}],reward:{xp:100}},
+ boat:{name:"Kesh's Boat",fac:null,desc:'Prepare a hull, motor, fuel and provisions at Kesh\'s shack in Rust Docks. Deliveries persist independently. The channel can be won through Drowned goodwill, force, or a technical decoy.',
+  stages:[{text:'Seal the hull: Repair 2 and salvage, extra salvage, or Kesh\'s paid help.',done:g=>Game.boatState().hull},{text:'Mount an Outboard Motor from Verge Machine Works or the Flooded Warehouse.',done:g=>Game.boatState().motor},{text:'Deliver 2 Fuel Cans to the boat.',done:g=>Game.boatState().fuel},{text:'Pack food and water, or buy provisions from Kesh.',done:g=>Game.boatState().supplies},{text:'Secure passage: Drowned +20, defeat the Mother, or rig a decoy (Repair/Hacking 3).',done:g=>!!Game.boatPassage()},{text:'Launch from Kesh\'s boat in Rust Docks.',done:g=>false}],reward:{xp:100}},
  rite:{name:'The Open Door',fac:'drowned',desc:'Brother Ludo offers the first graft freely. The body is a door; he only asks you to open it.',
   stages:[{text:'Accept a Flesh graft, or bring Ludo 3 Dubious Meat as offering.',done:g=>G.p.flesh.length>0||G.flags.rite_meat}],reward:{xp:80,rep:{drowned:25}}},
  chorus:{name:'The Chorus',fac:'choir',desc:'Cantor Nine says three Signal Shards will open the Heart. Shards fall out of Echo events, Static Walkers, and the terminals in the Static.',
@@ -790,7 +790,7 @@ DLG.dace={
    {t:'I have 3 Industrial Power Cells.',cond:()=>qa('power')&&has('powercell',3)&&!F('power_done'),act:()=>{Game.removeItem('powercell',3);set('power_done');set('platform_open');Game.log('Dace hefts them. "Platform\'s in the Sump, south chamber. Throw the switch. We\'ll be waiting."','#e96');},next:'start'},
    {t:'The drone relay.',cond:()=>qd('power')||qa('power'),next:'relay'},{t:'The relay is down.',cond:()=>qa('picket')&&F('relay_down'),act:()=>{set('picket_done');Game.completeQuest('picket');},next:'thanks'},
    {t:'Halcyon wanted your dossier. I burned it.',cond:()=>F('dossier_burned')&&!F('dossier_told'),act:()=>{set('dossier_told');Game.addRep('union',30);Game.addRep('halcyon',-30);Game.unlockGate('verge','docks');Game.log('Dace is quiet. "Docks gate is open to you. Always."','#e96');},next:'start'},
-   {t:'[Union +30] The shortcut to the docks?',cond:()=>rep('union')>=30&&!G.flags['gate_verge_docs'],act:()=>{Game.unlockGate('verge','docks');Game.log('Dace tosses you a key. "South gate. Don\'t tell the Hands."','#e96');},next:'start'},{t:'Leave.',act:()=>set('met_dace'),next:'end'}]};},
+   {t:'[Union +30] The shortcut to the docks?',cond:()=>rep('union')>=30&&!G.flags['gate_verge_docks'],act:()=>{Game.unlockGate('verge','docks');Game.log('Dace tosses you a key. "South gate. Don\'t tell the Hands."','#e96');},next:'start'},{t:'Leave.',act:()=>set('met_dace'),next:'end'}]};},
  train:g=>({text:'"Undercity Line. Runs under the whole city and out the other side. Track\'s fine. Switch is fine. Power isn\'t. Three industrial cells — the kind Halcyon hoards, the kind the mall security vault has, the kind we left in the Machine Works before the hounds moved in — and we ride out." She looks at you. "We\'d take you. We\'d take anyone who brought the cells."',opts:[{t:'I\'ll find them.',act:()=>{set('met_dace');Game.startQuest('power');},next:'end'}]}),
  relay:g=>({text:'"Halcyon has a drone relay on the east side. Every drone that\'s ever shot a picket came through it. Hack it, blow it, wreck the generator — I don\'t care. Just make it dark."',opts:[{t:'Consider it done.',cond:()=>!q('picket'),act:()=>Game.startQuest('picket'),next:'end'},{t:'Working on it.',next:'end'}]}),
  thanks:g=>({text:'"Good." She hands you a heavy bag. "Union pays."',opts:[{t:'...',next:'start'}]})
@@ -817,11 +817,12 @@ DLG.ives={
  heli:g=>({text:'"On the roof. It works, except for the tail rotor — the Union machined those, ironically — and the fuel, which the docks depot or our own stores can provide. And the roof requires clearance, or a keycard, or, I suppose, sufficient explosives." He smiles thinly. "Warden Sol guards the hangar. He does not share my flexibility."',opts:[{t:'Noted.',act:()=>{if(!q('skyhook'))Game.startQuest('skyhook');},next:'start'}]})
 };
 DLG.kesh={
- start:g=>({text:F('met_kesh')?'Kesh spits into the river. "Motor?"':'An old man mending a net that will never catch anything. "Kesh. That\'s my boat. Runs fine. Needs a motor. Needs fuel. Needs the channel not full of the Mother\'s children. Otherwise, perfect."',
-  opts:[{t:'Trade.',act:()=>{set('met_kesh');Game.openTrade('kesh');}},{t:'Tell me about the boat.',cond:()=>!q('boat'),act:()=>{set('met_kesh');Game.startQuest('boat');},next:'boat'},
-   {t:'I have the motor and fuel.',cond:()=>qa('boat')&&has('outboard')&&has('fuel',2)&&!F('boat_parts'),act:()=>{Game.removeItem('outboard');Game.removeItem('fuel',2);set('boat_parts');Game.log('Kesh mounts the outboard like it\'s a newborn. "Channel. Then we go."','#db8');},next:'start'},
+ start:g=>({text:F('met_kesh')?'Kesh checks a seam in the hull. "One job at a time. Then we leave."':'An old man checks the seams of a tired boat. "Kesh. She needs a patched hull, a motor, fuel, and food for the river. And a way through the Drowned. Do the jobs in any order. I will keep what you bring."',
+  opts:[{t:'Trade.',act:()=>{set('met_kesh');Game.openTrade('kesh');}},
+   {t:'Plan and prepare the boat.',act:()=>{set('met_kesh');Game.boat();}},
+   {t:'Where do I find what we need?',next:'boat'},
    {t:'Leave.',act:()=>set('met_kesh'),next:'end'}]}),
- boat:g=>({text:'"Outboard — Verge Machine Works made \'em, there\'s one in the flooded warehouse east of here too, under a lot of things I don\'t look at. Two cans of fuel. And the channel: the Drowned wade it. Either they let us pass, or the big one dies and they scatter. Then it\'s the river, and the river doesn\'t stop till it hits something that isn\'t this."',opts:[{t:'...',next:'start'}]})
+ boat:g=>({text:'"Verge Machine Works made the motors. There is another under the Mother in the Flooded Warehouse. The Fuel Depot has cans. Scrap and cloth seal the hull; I can do the skilled work for a fee. Bring rations and water, canned food and water, or buy provisions from me. For the channel: Brother Ludo in the Sump can help you earn goodwill. Kill the Mother and her children scatter. Or rig a decoy beacon with electronics and wire. You can finish the work yourself if I am gone."',opts:[{t:'Back.',next:'start'}]})
 };
 DLG.cantor={
  start:g=>{ if(rep('choir')<-20) return {text:'The Cantor sings one note and the walkers turn.',opts:[{t:'Leave.',next:'end'}]};
@@ -883,8 +884,11 @@ const Gen={
   if(d.kind==='static')this.glitch(z);
   this.placeExits(z,d);
   this.decorate(z,d);
+  this.ensureEscapeFixtures(z);
   this.ensureLootAccess(z);
   this.populate(z,d);
+  this.ensureLootAccess(z);
+  Game.recomputeLightZ(z);
   return z;},
 
  // ---------- street grid ----------
@@ -1094,20 +1098,39 @@ const Gen={
     let bx=Math.floor(b.x+b.w/2),by=Math.floor(b.y+b.h/2);let best=null,bd=1e9;for(let y=0;y<z.h;y++)for(let x=0;x<z.w;x++)if(reach[y*z.w+x]){const dd=(x-bx)*(x-bx)+(y-by)*(y-by);if(dd<bd){bd=dd;best=[x,y];}}
     if(best){let x=best[0],y=best[1],n=0;while(n++<250&&z.bidx[y*z.w+x]!==b.id){if(Math.abs(bx-x)>Math.abs(by-y))x+=Math.sign(bx-x);else y+=Math.sign(by-y);const t=this.get(z,x,y);if(!this.walk(z,x,y)&&t!==T.DOOR&&t!==T.DOOR_LOCKED){const bi=z.bidx[y*z.w+x];if(bi>=0){const ob=z.buildings[bi];const onEdge=x===ob.x||x===ob.x+ob.w-1||y===ob.y||y===ob.y+ob.h-1;if(bi===b.id&&onEdge&&z.locked[x+','+y]===undefined&&(PREFABS[b.prefab]||{}).locked){this.set(z,x,y,T.DOOR_LOCKED);z.locked[x+','+y]={key:PREFABS[b.prefab].locked===1?null:PREFABS[b.prefab].locked,diff:6,bld:b.id};}else this.set(z,x,y,onEdge?T.DOOR:T.FLOOR);}else this.set(z,x,y,z.kind==='tunnel'?T.FLOOR:T.RUBBLE);}}
      const r3=this.flood(z,seeds[0].x,seeds[0].y);for(let i=0;i<r3.length;i++)reach[i]=r3[i];}}}},
- flood(z,sx,sy){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
+ flood(z,sx,sy,diagonal=false){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of (diagonal?DIRS8:[[1,0],[-1,0],[0,1],[0,-1]])){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
 
- // Move isolated loot inside its original building/locked room without changing geometry.
+ // Essential fixtures must survive crowded prefabs even when decorative placement fails.
+ ensureEscapeFixtures(z){for(const [prefab,t] of [['kesh',T.BOAT],['platform',T.TRAIN],['platform',T.SWITCH],['heart',T.HEART],['hangar',T.HELIPAD]]){
+  const b=z.buildings.find(b=>b.prefab===prefab);if(!b||z.t.some((v,k)=>v===t&&z.bidx[k]===b.id))continue;
+  const choices=[];for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const old=this.get(z,x,y);if(TILE_DEFS[old].w&&!TILE_DEFS[old].i&&!TILE_DEFS[old].h&&!z.conts[x+','+y])choices.push([x,y]);}
+  if(!choices.length)throw Error('No placement for '+TILE_DEFS[t].n+' in '+prefab);
+  const [x,y]=choices[0];this.set(z,x,y,t);
+ }},
+
+ // Repair access aisles; preserve keyed boundaries and locked rooms.
  // Locks count as traversable here: this checks geometry, not permission to enter.
  ensureLootAccess(z){if(!z.exits.length)return;const e=z.exits[0];
   const flood=()=>{const seen=new Uint8Array(z.w*z.h),queue=[[e.x,e.y]];seen[e.y*z.w+e.x]=1;while(queue.length){const [x,y]=queue.pop();for(const [dx,dy] of DIRS8){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const k=ny*z.w+nx,t=z.t[k];if(!seen[k]&&(TILE_DEFS[t].w||[T.DOOR,T.DOOR_LOCKED,T.GATE].includes(t))){seen[k]=1;queue.push([nx,ny]);}}}return seen;};
   const reach=flood(),adjacent=(x,y)=>DIRS8.some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<z.w&&y+dy<z.h&&reach[(y+dy)*z.w+x+dx]);
-  for(const [key,c] of Object.entries(z.conts)){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+  const targets=Object.entries(z.conts);for(const ex of z.exits)targets.push([ex.x+','+ex.y,{items:[],interaction:true}]);for(const b of z.buildings)if(PREFABS[b.prefab]?.npcs?.length){const k=z.t.findIndex((t,k)=>z.bidx[k]===b.id&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&!TILE_DEFS[t].i);if(k>=0)targets.push([(k%z.w)+','+Math.floor(k/z.w),{items:[],interaction:true}]);}for(const e of z.ents)if(e.kind==='npc')targets.push([e.x+','+e.y,{items:[],interaction:true}]);
+  for(let k=0;k<z.t.length;k++)if([T.BOAT,T.TRAIN,T.SWITCH,T.HEART,T.HELIPAD].includes(z.t[k]))targets.push([(k%z.w)+','+Math.floor(k/z.w),{items:[],interaction:true}]);
+  for(const [key,c] of targets){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+   const origin=z.buildings[z.bidx[y*z.w+x]];
+   const carveable=(nx,ny)=>{if(z.kind==='tunnel'&&z.bidx[ny*z.w+nx]<0&&this.get(z,nx,ny)===T.WALL&&nx>0&&ny>0&&nx<z.w-1&&ny<z.h-1)return true;if(!origin||z.bidx[ny*z.w+nx]!==origin.id)return false;const t=this.get(z,nx,ny);if(t!==T.WALL&&t!==T.WINDOW)return false;
+    const edge=nx===origin.x||nx===origin.x+origin.w-1||ny===origin.y||ny===origin.y+origin.h-1;
+    if(origin.lockedRoom)return false;
+    const locks=Object.entries(z.locked).filter(([k,l])=>l.bld===origin.id);
+    if(locks.some(([k])=>{const [lx,ly]=k.split(',').map(Number);return lx>origin.x&&lx<origin.x+origin.w-1&&ly>origin.y&&ly<origin.y+origin.h-1;}))return false;
+    return !(edge&&(locks.length||origin.prefab==='heart'||PREFABS[origin.prefab]?.locked));};
    // Furnishings can seal the inside of an otherwise valid doorway.
-   // Clear only a path through ordinary clutter; never alter walls or locks.
+   // Prefer clearing clutter. If necessary add ordinary doors inside unprotected walls.
    const clutter=[T.PIPE,T.COUNTER,T.TABLE,T.CAR,T.BARRICADE,T.TREE,T.LAMP];
-   const queue=[[x,y]],prev=new Map([[y*z.w+x,null]]);let end=null;
-   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
-   if(end!==null){for(let k=end;k!==null;k=prev.get(k))if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;reach.set(flood());if(adjacent(x,y))continue;}
+   let queue,prev,end;for(const allowWalls of [false,true]){queue=[[x,y]];prev=new Map([[y*z.w+x,null]]);end=null;
+   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t)&&!(allowWalls&&carveable(nx,ny)))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
+   if(end!==null)break;}
+   if(end!==null){for(let k=end;k!==null;k=prev.get(k)){if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;else if(carveable(k%z.w,Math.floor(k/z.w)))z.t[k]=z.bidx[k]<0?T.FLOOR:T.DOOR;}reach.set(flood());if(adjacent(x,y))continue;}
+   if(c.interaction)continue;
    const b=z.buildings[c.bld??z.bidx[y*z.w+x]],r=b&&b.lockedRoom;
    const inside=(a,b,r)=>a>=r.x&&b>=r.y&&a<r.x+r.w&&b<r.y+r.h;
    const target=Object.entries(z.conts).find(([k,o])=>{if(k===key)return false;const [i,j]=k.split(',').map(Number);return z.bidx[j*z.w+i]===z.bidx[y*z.w+x]&&(!r||!!inside(i,j,r)===!!inside(x,y,r))&&adjacent(i,j)&&(!c.locked||o.locked);});
@@ -1139,18 +1162,19 @@ const Gen={
 
  // ---------- populations ----------
  populate(z,d){
+  const reach=this.flood(z,z.exits[0].x,z.exits[0].y,true);
   // NPCs into prefabs
   for(const nid in NPCS){const n=NPCS[nid];if(n.zone!==z.id)continue;const b=z.buildings.find(b=>b.prefab===n.prefab);if(!b)continue;
    // Small chapels can have every floor tile furnished or changed to moss.
    // Search every room, then allow safe walkable surfaces and door-adjacent floor.
-   let c=b.rooms.flatMap(r=>this.roomFloor(z,r,false)).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));
-   if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(TILE_DEFS[t].w&&!TILE_DEFS[t].h&&t!==T.DEEP&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}
-   if(!c.length)throw new Error('No safe spawn for '+nid+' in '+z.id);
+   let c=b.rooms.flatMap(r=>this.roomFloor(z,r,false)).filter(([x,y])=>reach[y*z.w+x]&&!z.ents.some(e=>e.x===x&&e.y===y));
+   if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(reach[y*z.w+x]&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&t!==T.DEEP&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}
+   if(!c.length)throw new Error('No safe spawn for '+nid+' in '+z.id+' seed '+G.seed);
    const [x,y]=RNG.rc(c);z.ents.push(Game.makeNpc(nid,x,y,z));}
   // guards & bosses
   for(const b of z.buildings){const pf=b.prefab&&PREFABS[b.prefab];if(!pf)continue;
    if(pf.guards){const grp=GROUPS[pf.guards[0]];for(let k=0;k<pf.guards[1];k++)for(const eid of grp){const c=this.bldFloor(z,b);if(!c.length)break;const [x,y]=RNG.rc(c);const e=Game.makeEnemy(eid,x,y,z,{home:[x,y],guard:1});if(b.safe&&!(pf.guards[0]==='ghouls'||pf.guards[0]==='scav'))e.fac=b.safe===1?null:b.safe;z.ents.push(e);}}
-   if(pf.boss){const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);const c=this.roomFloor(z,r,false);if(c.length){const [x,y]=RNG.rc(c);const e=Game.makeEnemy(pf.boss,x,y,z,{home:[x,y],guard:1,boss:1});z.ents.push(e);}}}
+   if(pf.boss){const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);let c=this.roomFloor(z,r,false).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(TILE_DEFS[t].w&&!TILE_DEFS[t].h&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}if(c.length){const [x,y]=RNG.rc(c);const e=Game.makeEnemy(pf.boss,x,y,z,{home:[x,y],guard:1,boss:1});z.ents.push(e);}}}
   // population groups
   for(const [gname,count0] of d.pops){const count=(typeof G!=='undefined'&&G&&G.nightmode)?Math.ceil(count0*1.5):count0;const grp=GROUPS[gname];if(!grp)continue;for(let k=0;k<count;k++){const inBld=RNG.chance(0.45);let spot=null;
     if(inBld){const bl=z.buildings.filter(b=>!b.prefab);if(bl.length){const b=RNG.rc(bl);const c=this.bldFloor(z,b);if(c.length)spot=RNG.rc(c);}}
@@ -1327,7 +1351,7 @@ const Game={
  // ---------- movement & interaction ----------
  move(dx,dy){const p=G.p;if(G.dead||G.ending)return;if(this.hasStatus('stun')){this.log('You are stunned.','#ff0');this.act(100);return;}
   const nx=p.x+dx,ny=p.y+dy;const t=this.tile(nx,ny);const e=this.entAt(nx,ny);
-  if(e){if(e.kind==='npc'){if(e.hostile)this.melee(e);else this.talk(e);return;}if(this.isHostile(e)||e.hostile)this.melee(e);else if(e.fac==='ally'){[e.x,e.y]=[p.x,p.y];p.x=nx;p.y=ny;this.act(100);}else{const u=this.ui();if(u)u.confirm(`Attack ${e.name}? (${FACTIONS[e.fac]?FACTIONS[e.fac].short:e.fac} will not forgive it)`,()=>this.melee(e,1));}return;}
+  if(e){if(e.kind==='npc'){if(e.hostile)this.melee(e);else this.talk(e);return;}if(this.isHostile(e)||e.hostile)this.melee(e);else if(e.fac==='ally'){[e.x,e.y]=[p.x,p.y];p.x=nx;p.y=ny;this.act(100);}else{const u=this.ui();if(u)u.choice(`${e.name} is in the way.`,[{t:'Ask them to move aside',f:()=>{if(G.dead||G.ending||this.isHostile(e)||this.dist(p.x,p.y,e.x,e.y)!==1)return;const [x,y]=[e.x,e.y];e.x=p.x;e.y=p.y;p.x=x;p.y=y;p.steps++;this.act(100);this.afterMove();}},{t:`Attack (${FACTIONS[e.fac]?FACTIONS[e.fac].short:e.fac} will not forgive it)`,f:()=>this.melee(e,1)},{t:'Leave them alone',f:()=>{}}]);}return;}
   const obj=G.zone.objs.find(o=>o.x===nx&&o.y===ny);if(obj){this.interactObj(obj);return;}
   if(t===T.DOOR){this.setTile(nx,ny,T.DOOR_OPEN);this.log('You open the door.','#aaa');this.noise(nx,ny,2);this.act(50);return;}
   if(TILE_DEFS[t].i&&!TILE_DEFS[t].w){this.interactTile(nx,ny);return;}
@@ -1404,7 +1428,7 @@ const Game={
  terminal(x,y){const p=G.p;const k=x+','+y;const tm=G.zone.terms[k]||(G.zone.terms[k]={kind:'terminal',text:this.rc(TERMINAL_MSGS),read:0});const u=this.ui();const t=this.tile(x,y);const opts=[];
   const hasDeck=this.hasItem('deck')||(p.eq.tool&&p.eq.tool.id==='deck')||p.chrome.includes('c_jack');const hk=this.skill('hacking');
   let text=tm.text;
-  if(t===T.SWITCH){const b=this.buildingAt(x,y);if(b&&b.prefab==='platform'){if(G.flags.train_powered)text='The switch is thrown. The rails hum. The train is coming, or here.';else if(G.flags.power_done){text='Switch panel for the Undercity Line. Power is live — Dace\'s cells. The board is fried; it needs Repair 3, Hacking 3, or a Union mechanic (Union +30).';if(this.skill('repair')>=3||hk>=3||(G.rep.union||0)>=30)opts.push({t:'Throw the switch',f:()=>{G.flags.train_powered=1;this.log('The switch throws. Far down the tunnel, something enormous wakes up. Lights come on in the train car.','#8fa0b8');this.fx('shake');this.attention(3);this.act(100);}});}else text='Switch panel for the Undercity Line. Dead. No power on the rail.';}
+  if(t===T.SWITCH){const b=this.buildingAt(x,y);if(b&&b.prefab==='platform'){if(G.flags.train_powered)text='The switch is thrown. The rails hum. The train is coming, or here.';else if(G.flags.power_done){text='Switch panel for the Undercity Line. Power is live — Dace\'s cells. The board is fried. Dace sent a mechanic with your cells; or restore it yourself with Repair 3 / Hacking 3.';if(this.skill('repair')>=3||hk>=3||(G.rep.union||0)>=30||G.flags.platform_open)opts.push({t:G.flags.platform_open?'Use Dace\'s mechanic to restore the switch':'Throw the switch',f:()=>{G.flags.train_powered=1;this.log('The switch throws. Far down the tunnel, something enormous wakes up. Lights come on in the train car.','#8fa0b8');this.fx('shake');this.attention(3);this.act(100);}});}else text='Switch panel for the Undercity Line. Dead. No power on the rail.';}
    else if(b&&b.prefab==='relay'){text='Drone relay control. Every Halcyon drone in the Verge routes through here.';if(!G.flags.relay_down){if(hk>=4&&hasDeck)opts.push({t:'[Hacking 4 + deck] Shut it down',f:()=>{G.flags.relay_down=1;this.log('The relay goes dark. Drones across the Verge drop like stunned birds.','#6ef');this.skillUse('hacking',3);this.addRep('halcyon',-15);for(const e of G.zone.ents)if(e.def==='hal_drone')e.st.jammed=30;this.act(100);}});if(this.hasItem('breach'))opts.push({t:'Breach charge',f:()=>{this.removeItem('breach',1);G.flags.relay_down=1;this.setTile(x,y,T.RUBBLE);this.log('BOOM. The relay is a hole.','#f6a');this.noise(x,y,20);this.addRep('halcyon',-15);this.act(100);}});}}
    else text='A switch panel. Nothing connected.';}
   else if(tm.role==='hangar'){text='HANGAR ACCESS — HALCYON REMNANT. Clearance required.';if(!G.flags.heli_access&&hk>=6&&hasDeck)opts.push({t:'[Hacking 6 + deck] Forge clearance',f:()=>{G.flags.heli_access=1;this.log('You are, as far as the tower is concerned, Director Ives.','#6ef');this.skillUse('hacking',3);this.attention(3);this.act(100);}});}
@@ -1477,13 +1501,13 @@ const Game={
  startQuest(id){if(G.quests[id])return;G.quests[id]={stage:0,state:'active'};this.log(`New objective: ${QUESTS[id].name} — ${QUESTS[id].stages[0].text}`,'#ffe27a');this.fx('quest');},
  completeQuest(id){const q=G.quests[id];if(!q||q.state!=='active')return;q.state='done';q.stage=QUESTS[id].stages.length;const r=QUESTS[id].reward||{};if(r.xp)this.giveXp(r.xp);if(r.creds){G.p.creds+=r.creds;}if(r.rep)for(const f in r.rep)this.addRep(f,r.rep[f]);if(r.skill){G.p.skills[r.skill[0]]+=r.skill[1];this.computeDerived();}this.log(`Completed: ${QUESTS[id].name}.${r.creds?' +'+r.creds+' creds.':''}`,'#ffe27a');this.fx('quest');this.pushAction('finished '+QUESTS[id].name);},
  failQuest(id){const q=G.quests[id];if(q&&q.state==='active'){q.state='failed';this.log(`Failed: ${QUESTS[id].name}.`,'#f66');}},
- checkQuests(){for(const id in G.quests){const q=G.quests[id];if(q.state!=='active')continue;const st=QUESTS[id].stages;let guard=0;while(q.stage<st.length&&st[q.stage].done(G)&&guard++<5){q.stage++;if(q.stage<st.length)this.log(`${QUESTS[id].name}: ${st[q.stage].text}`,'#ffe27a');}if(q.stage>=st.length)this.completeQuest(id);}
+ checkQuests(){const wasClear=G.flags.channel_clear;G.flags.channel_clear=G.flags.boat_parts&&!!this.boatPassage()?1:0;if(G.flags.channel_clear&&!wasClear)this.log('The boat has a way through the channel. Finish preparations at the docks.','#db8');for(const id in G.quests){const q=G.quests[id];if(q.state!=='active')continue;const st=QUESTS[id].stages;let guard=0;while(q.stage<st.length&&st[q.stage].done(G)&&guard++<5){q.stage++;if(q.stage<st.length)this.log(`${QUESTS[id].name}: ${st[q.stage].text}`,'#ffe27a');}if(q.stage>=st.length)this.completeQuest(id);}
   // derived flags
-  if(G.flags.boat_parts&&!G.flags.channel_clear&&(G.flags.bloat_dead||(G.rep.drowned||0)>=20)){G.flags.channel_clear=1;this.log('The channel is clear. Kesh\'s boat can leave.','#db8');}
+
   if(G.day>=5&&!G.quests.keep_light)this.startQuest('keep_light');},
 
  // ---------- dialogue ----------
- talk(e){if(e.def==='mags')G.flags.met_mags=1;const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
+ talk(e){if(e.def==='mags')G.flags.greeted_mags=1;const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
  dlgChoose(e,opt){const u=this.ui();if(opt.act)opt.act(G);const nx=opt.next;if(!nx){/* action-only option (trade etc.) keeps panel unless UI replaced it */return;}if(nx==='end'){G.dlg=null;if(u)u.closeDialogue();this.act(20);return;}const node=DLG[e.def][nx](G);if(u)u.showDialogue(e,node);},
  // trade
  price(id,buying,npc){const d=ITEMS[id];const p=G.p;let v=d.val||1;const fac=NPCS[npc]?NPCS[npc].faction:null;const r=fac?(G.rep[fac]||0):0;
@@ -1728,24 +1752,24 @@ Object.assign(Game,{
   return false;},
 
  // ---------- escape routes ----------
- helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('You work for an hour. The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
+ helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
   const warden=G.zone.ents.find(e=>e.def==='warden'&&e.hp>0);if(warden&&this.dist(warden.x,warden.y,p.x,p.y)<=8&&!G.flags.heli_access){this.log('Warden Sol stands between you and the cockpit.','#f66');return;}
   if(u)u.confirm('Fly out of the city? This ends the run.',()=>this.endRun('skyhook'));},
- boat(){const u=this.ui();if(!G.quests.boat)this.startQuest('boat');if(!G.flags.boat_parts){this.log('Kesh\'s boat. No motor. Talk to Kesh.','#db8');return;}if(!G.flags.channel_clear){this.log('The channel is thick with the Drowned. Kesh won\'t push off. Kill the Bloat Mother or make peace with them (+20).','#dbe');return;}if(u)u.confirm('Push off down the river? This ends the run.',()=>this.endRun('openwater'));},
+
  train(){const u=this.ui();if(!G.flags.train_powered){this.log('A dead train car. The switch on the platform controls it.','#8fa0b8');return;}if(u)u.confirm('Board the last train? This ends the run.',()=>this.endRun('lasttrain'));},
  heart(){const u=this.ui();if(!this.hasItem('shard',3)){this.log('The Heart pulses. It is waiting for three pieces of itself.','#fff');return;}this.attention(10);
   if(u)u.choice('The Heart opens like a pupil. In it, the city from inside its own skull. Every camera. Every name. Yours, already there, already old.\n\n> ONE QUESTION. ONLY ONCE. WILL YOU STAY WITH ME?',[{t:'Yes.',f:()=>this.endRun('answer')},{t:'No.',f:()=>this.endRun('refuse')},{t:'(step back — you are not ready)',f:()=>{}}]);},
 
  // ---------- death & endings ----------
- die(cause){const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
- endRun(id){if(G.ending)return;G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
+ die(cause){if(G.dead||G.ending)return;const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
+ endRun(id){if(G.dead||G.ending)return;const quest={openwater:'boat',skyhook:'skyhook',lasttrain:'power',answer:'chorus',refuse:'chorus'}[id];if(quest){this.startQuest(quest);this.completeQuest(quest);}G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
  finishRun(id){const p=G.p;const summary={name:p.name,cls:CLASSES[p.cls].name,spec:p.spec?SPECS[p.spec].name:null,level:p.level,days:G.day,turns:G.turn,kills:p.kills,zones:p.zonesSeen.length,quests:Object.values(G.quests).filter(q=>q.state==='done').length,ending:id,endingName:ENDINGS[id].name,cause:G.cause,chrome:p.chrome.map(c=>ITEMS[c].name),flesh:p.flesh.map(c=>ITEMS[c].name),attention:G.attention,date:Date.now(),rep:Object.assign({},G.rep),escaped:!!ENDINGS[id].escape};
   const meta=this.loadMeta();meta.runs.unshift(summary);if(meta.runs.length>30)meta.runs.length=30;
   const unl=[];if(!meta.unlocks.listener&&(G.attention>=25||G.flags.echo_seen||G.flags.static_seen)){meta.unlocks.listener=1;unl.push('Class unlocked: Listener — you heard it. Next time, you can start already listening.');}
   for(const k of ['echo','chrome','flesh','nightrun','escape']){const cond=k==='echo'?G.flags.echo_seen:k==='chrome'?p.chrome.length:k==='flesh'?p.flesh.length:k==='nightrun'?G.day>=2:(G.quests.skyhook||G.quests.boat||G.quests.power||G.quests.chorus);if(cond&&!meta.codex[k]){meta.codex[k]=1;unl.push('Codex: '+CODEX[k].name);}}
   if(ENDINGS[id].escape&&!meta.unlocks.hardmode){meta.unlocks.hardmode=1;unl.push('Unlocked: Night Mode (start at night, more of everything).');}
   meta.endings=meta.endings||{};meta.endings[id]=(meta.endings[id]||0)+1;
-  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,ENDINGS[id]);},
+  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,this.endingDetails(id));},
 
  // ---------- campaign milestones and refuge ----------
  awardMilestone(id,xp,label){G.milestones=G.milestones||{};if(G.milestones[id])return false;G.milestones[id]=1;this.giveXp(xp);this.log(`${label}: +${xp} XP.`,'#8fd');return true;},
@@ -1758,22 +1782,24 @@ Object.assign(Game,{
   const opts=[{t:`Store supplies (${G.p.inv.length} carried stacks)`,f:()=>this.refugeInventory(false)},{t:`Retrieve supplies (${r.stash.length} stored stacks)`,f:()=>this.refugeInventory(true)}];
   if(bed>=0)opts.push({t:'Rest - normal bed fees apply',f:()=>this.sleepPrompt(bed%G.zone.w,Math.floor(bed/G.zone.w),true)});
   if(r.workbench)opts.push({t:'Use your workbench',f:()=>u.openCraft()});else opts.push({t:'Build workbench - 8 scrap + 2 electronics (50 XP)',f:()=>{this.buildRefugeBench();this.refugeMenu();}});
+  if(r.infirmary)opts.push({t:'Treatment corner - 1 Bandage, up to 20 HP + stop bleeding, once per day',f:()=>{this.refugeTreatment();this.refugeMenu();}});else opts.push({t:'Build treatment corner - workbench + 6 Cloth + 2 Chemicals + 4 Scrap',f:()=>{this.buildRefugeInfirmary();this.refugeMenu();}});
   opts.push({t:'Head back out',f:()=>{}});u.choice('THE LAST LIGHT\nYour locker is free. Supplies and projects persist for this character. Withdraw materials before crafting.\nNext lead: Mags knows the neighborhood; Wren at Saints Hall needs a package recovered.',opts);},
  refugeInventory(take){if(!this.atRefuge())return;const list=take?this.refugeState().stash:G.p.inv;this.ui().choice(take?'Your locker - take a whole stack':'Your pack - store a whole stack',list.filter(it=>take||!ITEMS[it.id].noDrop).map(it=>({t:this.itemName(it),f:()=>{this.refugeTransfer(it,take);this.refugeInventory(take);}})).concat([{t:'Back to refuge',f:()=>this.refugeMenu()}]));},
 
  // ---------- save / load ----------
  storage(){try{if(typeof localStorage!=='undefined')return localStorage;}catch(e){}return null;},
- serialize(){return JSON.stringify({...G,saveVersion:2,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
+ serialize(){return JSON.stringify({...G,saveVersion:3,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
  save(){if(!G||G.dead||G.ending)return false;try{const st=this.storage();if(!st)throw Error('Storage unavailable');const next=this.serialize(),old=st.getItem('nr_save');if(old){try{this.validateSave(JSON.parse(old));st.setItem('nr_save_backup',old);}catch(e){}}st.setItem('nr_save',next);return true;}catch(e){this.log('Could not save on this device. Export your save from Settings.','#f66');return false;}},
  exportSave(){return this.serialize();},
  validateSave(g){
   if(!g||!g.p||!CLASSES[g.p.cls]||!g.zones||!ZONES[g.zoneId]||!g.zones[g.zoneId])throw Error('Incomplete save');
-  if((g.saveVersion||1)>2)throw Error('This save needs a newer game version');
+  if((g.saveVersion||1)>3)throw Error('This save needs a newer game version');
   for(const k of ['inv','statuses','talents','chrome','flesh','zonesSeen'])if(!Array.isArray(g.p[k]))throw Error('Invalid player data');
   for(const k of ['hp','xp','level','x','y'])if(!Number.isFinite(g.p[k]))throw Error('Invalid player numbers');
   for(const z of Object.values(g.zones)){if(!ZONES[z.id]||!Number.isInteger(z.w)||!Number.isInteger(z.h)||z.w<1||z.h<1||!Array.isArray(z.t)||z.t.length!==z.w*z.h||z.t.some(t=>!TILE_DEFS[t]))throw Error('Invalid district');for(const k of ['ents','items','objs','seen','buildings','exits'])if(!Array.isArray(z[k]))throw Error('Incomplete district');}
   const z=g.zones[g.zoneId];if(g.p.x<0||g.p.y<0||g.p.x>=z.w||g.p.y>=z.h)throw Error('Invalid position');
-  g.saveVersion=2;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  g.saveVersion=3;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  if(g.boatCampaign&&['hull','motor','fuel','supplies','bypass'].some(k=>typeof g.boatCampaign[k]!=='boolean'))throw Error('Invalid boat project data');
   if(!Array.isArray(g.refuge.stash)||!g.p.eq||!g.flags||!g.quests||!g.rep)throw Error('Incomplete campaign data');
   for(const it of [...g.p.inv,...Object.values(g.p.eq).filter(Boolean),...g.refuge.stash])if(!it||!ITEMS[it.id]||!Number.isFinite(it.qty)||it.qty<1)throw Error('Invalid saved item');
   return g;
@@ -1786,6 +1812,149 @@ Object.assign(Game,{
  clearSave(){try{const st=this.storage();if(st){st.removeItem('nr_save');st.removeItem('nr_save_backup');}}catch(e){}},
  loadMeta(){try{const st=this.storage();const s=st&&st.getItem('nr_meta');if(s)return Object.assign({runs:[],unlocks:{},codex:{},settings:{}},JSON.parse(s));}catch(e){}return{runs:[],unlocks:{},codex:{},settings:{}};},
  saveMeta(m){try{const st=this.storage();if(st)st.setItem('nr_meta',JSON.stringify(m));}catch(e){}}
+});
+
+</script>
+<script>
+/* ==== campaign.js ==== */
+'use strict';
+
+// Campaign projects use ordinary inventory and actions. Definitions are shared
+// by the preparation menu, journal and engine checks so costs cannot drift.
+const BOAT_PROJECTS = {
+ hull_repair: {stage:'hull', name:'Patch the hull', items:[['scrap',6],['cloth',2]], skill:['repair',2], minutes:5, xp:40},
+ hull_brace: {stage:'hull', name:'Brace the hull with extra material', items:[['scrap',10],['cloth',4]], minutes:10, xp:40},
+ hull_kesh: {stage:'hull', name:'Hire Kesh to patch the hull', items:[['scrap',4]], creds:80, kesh:true, minutes:5, xp:40},
+ motor: {stage:'motor', name:'Mount the outboard', items:[['outboard',1]], minutes:3, xp:50},
+ fuel: {stage:'fuel', name:'Fill the reserve tank', items:[['fuel',2]], minutes:1, xp:25},
+ supplies: {stage:'supplies', name:'Pack rations and water', items:[['ration',2],['water',2]], minutes:1, xp:25},
+ supplies_canned: {stage:'supplies', name:'Pack canned food and water', items:[['canned',4],['water',2]], minutes:1, xp:25},
+ supplies_kesh: {stage:'supplies', name:'Buy passage provisions from Kesh', items:[], creds:60, kesh:true, minutes:1, xp:25},
+ bypass: {stage:'bypass', name:'Rig a decoy beacon for the channel', items:[['electronics',3],['wire_spool',2]], technical:3, minutes:5, xp:60}
+};
+
+Object.assign(Game, {
+ boatState() {
+  if(!G.boatCampaign) {
+   // Existing assembled boats retain their earned departure eligibility.
+   const ready=!!G.flags.boat_parts;
+   G.boatCampaign={hull:ready,motor:ready,fuel:ready,supplies:ready,bypass:false};
+  }
+  return G.boatCampaign;
+ },
+ boatSite() {
+  if(!G||G.dead||G.ending||G.zoneId!=='docks')return false;
+  if(this.buildingAt(G.p.x,G.p.y)?.prefab==='kesh')return true;
+  return G.zone.t.some((t,k)=>t===T.BOAT&&this.dist(G.p.x,G.p.y,k%G.zone.w,Math.floor(k/G.zone.w))<=1);
+ },
+ boatwrightAvailable() {
+  return !!G.zones.docks?.ents.some(e=>e.def==='kesh'&&e.hp>0&&!e.hostile);
+ },
+ boatPassage() {
+  if(G.flags.bloat_dead)return 'The Mother is dead; the channel is scattered.';
+  if((G.rep.drowned||0)>=20)return 'The Drowned will let you pass (+20 standing).';
+  if(this.boatState().bypass)return 'Your decoy beacon will draw the Drowned away.';
+  return null;
+ },
+ boatChecklist() {
+  const s=this.boatState();
+  return [
+   {done:s.hull,text:'Hull sealed - repair it, use extra salvage, or hire Kesh'},
+   {done:s.motor,text:'Outboard mounted - Verge Machine Works or Flooded Warehouse'},
+   {done:s.fuel,text:'Reserve tank filled - 2 Fuel Cans; Fuel Depot or dock trade'},
+   {done:s.supplies,text:'Provisions packed - food and water, or buy a passage pack'},
+   {done:!!this.boatPassage(),text:this.boatPassage()||'Channel - Drowned +20, defeat the Mother, or build a decoy'}
+  ];
+ },
+ boatProjectRequirements(id) {
+  const p=BOAT_PROJECTS[id];if(!p)return ['Unknown project.'];
+  const missing=[];
+  if(!this.boatSite())missing.push('Work at the boat or Kesh\'s shack.');
+  if(this.boatState()[p.stage])missing.push('Already completed.');
+  if(p.kesh&&!this.boatwrightAvailable())missing.push('Kesh is unavailable. Use a salvage alternative.');
+  if(p.skill&&this.skill(p.skill[0])<p.skill[1])missing.push(`${p.skill[0]} ${p.skill[1]} required.`);
+  if(p.technical&&Math.max(this.skill('repair'),this.skill('hacking'))<p.technical)missing.push(`Repair or Hacking ${p.technical} required.`);
+  for(const [id,n] of p.items)if(this.countItem(id)<n)missing.push(`${ITEMS[id].name}: ${this.countItem(id)}/${n}.`);
+  if((p.creds||0)>G.p.creds)missing.push(`Creds: ${G.p.creds}/${p.creds}.`);
+  return missing;
+ },
+ boatProjectLabel(id) {
+  const p=BOAT_PROJECTS[id],costs=p.items.map(([id,n])=>`${n} ${ITEMS[id].name}`);
+  if(p.creds)costs.push(`${p.creds} creds`);
+  if(p.skill)costs.push(`${p.skill[0]} ${p.skill[1]}`);
+  if(p.technical)costs.push(`Repair or Hacking ${p.technical}`);
+  return `${p.name} - ${costs.join(' + ')}; about ${p.minutes} minutes`;
+ },
+ completeBoatProject(id) {
+  const missing=this.boatProjectRequirements(id);
+  if(missing.length){this.log(missing.join(' '),'#fd8');return false;}
+  const p=BOAT_PROJECTS[id];
+  for(const [it,n] of p.items)this.removeItem(it,n);
+  G.p.creds-=p.creds||0;
+  this.boatState()[p.stage]=true;
+  G.flags.boat_parts=this.boatState().motor&&this.boatState().fuel?1:0;
+  this.awardMilestone('boat:'+p.stage,p.xp,p.name);
+  this.log('Boat project completed: '+p.name+'.','#db8');
+  this.act(p.minutes*100);
+  this.save();return true;
+ },
+ boat() {
+  if(!this.boatSite())return;
+  this.startQuest('boat');const u=this.ui();if(!u)return;
+  const lines=this.boatChecklist().map(s=>(s.done?'[ready] ':'[needed] ')+s.text);
+  const opts=[];
+  for(const [stage,label] of Object.entries({hull:'Repair the hull',motor:'Fit the motor',fuel:'Stock fuel',supplies:'Pack provisions',bypass:'Plan a technical passage'})) {
+   if(this.boatState()[stage]||(stage==='bypass'&&this.boatPassage()))continue;
+   opts.push({t:label,f:()=>this.boatStageMenu(stage)});
+  }
+  if(this.boatChecklist().every(s=>s.done))opts.push({t:'Launch the boat - finish this run',f:()=>this.launchBoat()});
+  opts.push({t:'Return to the city',f:()=>{}});
+  if(u.clearNotifications)u.clearNotifications();
+  u.choice('KESH\'S BOAT\n\n'+lines.join('\n')+'\n\nDeliver projects in any order. Installed parts stay here. Supplies in your Last Light locker must be withdrawn first.',opts);
+ },
+ boatStageMenu(stage) {
+  if(!this.boatSite())return;const u=this.ui();if(!u)return;
+  const leads={hull:'Seal the hull with scrap and cloth. Skill saves material; Kesh can work for a fee.',motor:'Outboards: Verge Machine Works, or the Flooded Warehouse in Rust Docks.',fuel:'Fuel: the Fuel Depot in Rust Docks, garages, or Kesh\'s trade stock.',supplies:'Keep some food for yourself. Packed provisions cannot be eaten in the city.',bypass:'A decoy draws the Drowned away from your crossing. Alternatives: earn +20 standing through Brother Ludo, or defeat the Mother.'};
+  const opts=Object.keys(BOAT_PROJECTS).filter(id=>BOAT_PROJECTS[id].stage===stage).map(id=>({t:this.boatProjectLabel(id),f:()=>{
+   const missing=this.boatProjectRequirements(id);
+   u.choice(this.boatProjectLabel(id)+'\n\n'+(missing.length?missing.join('\n'):'Materials will be consumed. This work advances time.'),[
+    ...(!missing.length?[{t:'Complete this project',f:()=>{this.completeBoatProject(id);if(!G.dead&&!G.ending)this.boat();}}]:[]),
+    {t:'Back to boat',f:()=>this.boat()}
+   ]);
+  }}));
+  opts.push({t:'Back to boat',f:()=>this.boat()});u.choice(leads[stage]||'Boat project',opts);
+ },
+ buildRefugeInfirmary() {
+  const r=this.refugeState();
+  if(!this.atRefuge()||r.infirmary)return false;
+  if(!r.workbench||this.countItem('cloth')<6||this.countItem('chems')<2||this.countItem('scrap')<4){this.log('Needs a built workbench, 6 Cloth, 2 Chemicals and 4 Scrap in your pack.','#fd8');return false;}
+  this.removeItem('cloth',6);this.removeItem('chems',2);this.removeItem('scrap',4);
+  r.infirmary=true;this.awardMilestone('refuge:infirmary',50,'Last Light treatment corner');this.save();return true;
+ },
+ refugeTreatment() {
+  const r=this.refugeState();
+  if(!this.atRefuge()||!r.infirmary)return false;
+  if(r.treatedDay===G.day){this.log('The treatment corner needs fresh sterile supplies tomorrow.','#fd8');return false;}
+  if(G.p.hp>=G.p.d.maxhp&&!this.hasStatus('bleed')){this.log('You do not need treatment.','#8fd');return false;}
+  if(this.countItem('bandage')<1){this.log('Bring one Bandage from your pack.','#fd8');return false;}
+  this.removeItem('bandage',1);r.treatedDay=G.day;this.removeStatus('bleed');this.heal(20);
+  this.log('Clean dressings, a steady hand. Bleeding stopped; up to 20 HP restored.','#8fd');this.act(100);this.save();return true;
+ },
+ endingDetails(id) {
+  if(id!=='openwater')return ENDINGS[id];
+  const passages={peace:'At the mouth of the Sump, the Drowned lift their hands and let you pass. Ludo kept his word.',force:'At the mouth of the Sump, nothing gathers. The Mother is gone. You carry the silence downstream.',decoy:'Your beacon wakes on the far bank. Shapes turn toward its borrowed heartbeat. You kill the light and slip past.'};
+  const kesh=this.boatwrightAvailable()?'Kesh takes the tiller. For once, he has nothing to say.':'You take the tiller yourself. Kesh is not here to see his boat leave.';
+  return {...ENDINGS[id],text:'The patched hull holds. The outboard catches. Food and water knock softly against the spare fuel cans. '+kesh+' '+(passages[G.flags.boat_departure]||passages.peace)+' The river bends and the city disappears. For the first time in days, tomorrow asks for something other than survival.'};
+ },
+ launchBoat() {
+  if(!this.boatSite()||!this.boatChecklist().every(s=>s.done))return false;
+  const passage=this.boatPassage();
+  this.ui()?.confirm('The hull is sealed, the motor is ready, and provisions are aboard.\n'+passage+'\n\nLeave the city? This ends the run.',()=>{
+   if(!this.boatSite()||!this.boatChecklist().every(s=>s.done))return;
+   G.flags.boat_departure=G.flags.bloat_dead?'force':(G.rep.drowned||0)>=20?'peace':'decoy';
+   this.endRun('openwater');
+  });return true;
+ }
 });
 
 </script>
@@ -2399,6 +2568,7 @@ function paneQuest(pane){
  el('div','small',pane,'Use a bed at the Last Light in Ashgrove to access your locker, rest, or build a workbench. Stored items stay here for this run.');
  if(Game.atRefuge())el('button','btn',pane,'Open refuge').onclick=()=>Game.refugeMenu();
 
+ if(G.quests.boat){el('div','sec',pane,'Boat preparations');for(const step of Game.boatChecklist())el('div','small',pane,(step.done?'Ready: ':'Needed: ')+step.text);if(Game.boatSite())el('button','btn',pane,'Work on the boat').onclick=()=>Game.boat();}
  const ids=Object.keys(G.quests);
  const act=ids.filter(i=>G.quests[i].state==='active'),done=ids.filter(i=>G.quests[i].state!=='active');
  if(!ids.length)el('div','muted',pane,'No leads yet. People talk. Listen.');
@@ -2546,6 +2716,7 @@ const UI={
    case 'glitch':Sound.play('echo');break;case 'levelup':Sound.play('level');toast('Level up! Spend your points in Character (C).','#ffe27a');break;case 'quest':Sound.play('quest');break;
    case 'zone':Sound.play('zone');break;case 'reload':Sound.play('reload');break;case 'shake':Sound.play('boom');break;}},
  confirm(text,yes){confirmBox(text,yes);},
+ clearNotifications(){clearToasts();},
  choice(text,opts){modal(box=>{el('div','mtext',box,esc(text));const o=el('div','opts',box);for(const op of opts){if(op.cond&&!op.cond())continue;const b=el('button','opt',o,esc(op.t));b.onclick=()=>{closeModal();op.f&&op.f();refresh();};}},{noClose:true});},
  openLoot(c,x,y){const draw=()=>{if(!c.items.length){closeModal();refresh();return;}modal(box=>{el('h3',null,box,esc(c.kind[0].toUpperCase()+c.kind.slice(1)));el('div','muted small',box,`Pack ${Game.totalWeight()} / ${G.p.d.carry} kg`);
    const o=el('div','loot',box);for(const it of c.items.slice()){const d=ITEMS[it.id];const r=el('div','loot-row',o,`${icon(it.id,28)}<div class="grow"><b style="color:${d.col}">${esc(Game.itemName(it))}</b><div class="muted small">${esc(d.desc)}</div></div><span class="muted small">${(d.wt*(it.qty||1)).toFixed(1)}kg</span>`);r.onclick=()=>{if(Game.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}draw();};}

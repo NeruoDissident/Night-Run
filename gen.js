@@ -24,8 +24,11 @@ const Gen={
   if(d.kind==='static')this.glitch(z);
   this.placeExits(z,d);
   this.decorate(z,d);
+  this.ensureEscapeFixtures(z);
   this.ensureLootAccess(z);
   this.populate(z,d);
+  this.ensureLootAccess(z);
+  Game.recomputeLightZ(z);
   return z;},
 
  // ---------- street grid ----------
@@ -235,20 +238,39 @@ const Gen={
     let bx=Math.floor(b.x+b.w/2),by=Math.floor(b.y+b.h/2);let best=null,bd=1e9;for(let y=0;y<z.h;y++)for(let x=0;x<z.w;x++)if(reach[y*z.w+x]){const dd=(x-bx)*(x-bx)+(y-by)*(y-by);if(dd<bd){bd=dd;best=[x,y];}}
     if(best){let x=best[0],y=best[1],n=0;while(n++<250&&z.bidx[y*z.w+x]!==b.id){if(Math.abs(bx-x)>Math.abs(by-y))x+=Math.sign(bx-x);else y+=Math.sign(by-y);const t=this.get(z,x,y);if(!this.walk(z,x,y)&&t!==T.DOOR&&t!==T.DOOR_LOCKED){const bi=z.bidx[y*z.w+x];if(bi>=0){const ob=z.buildings[bi];const onEdge=x===ob.x||x===ob.x+ob.w-1||y===ob.y||y===ob.y+ob.h-1;if(bi===b.id&&onEdge&&z.locked[x+','+y]===undefined&&(PREFABS[b.prefab]||{}).locked){this.set(z,x,y,T.DOOR_LOCKED);z.locked[x+','+y]={key:PREFABS[b.prefab].locked===1?null:PREFABS[b.prefab].locked,diff:6,bld:b.id};}else this.set(z,x,y,onEdge?T.DOOR:T.FLOOR);}else this.set(z,x,y,z.kind==='tunnel'?T.FLOOR:T.RUBBLE);}}
      const r3=this.flood(z,seeds[0].x,seeds[0].y);for(let i=0;i<r3.length;i++)reach[i]=r3[i];}}}},
- flood(z,sx,sy){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
+ flood(z,sx,sy,diagonal=false){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of (diagonal?DIRS8:[[1,0],[-1,0],[0,1],[0,-1]])){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
 
- // Move isolated loot inside its original building/locked room without changing geometry.
+ // Essential fixtures must survive crowded prefabs even when decorative placement fails.
+ ensureEscapeFixtures(z){for(const [prefab,t] of [['kesh',T.BOAT],['platform',T.TRAIN],['platform',T.SWITCH],['heart',T.HEART],['hangar',T.HELIPAD]]){
+  const b=z.buildings.find(b=>b.prefab===prefab);if(!b||z.t.some((v,k)=>v===t&&z.bidx[k]===b.id))continue;
+  const choices=[];for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const old=this.get(z,x,y);if(TILE_DEFS[old].w&&!TILE_DEFS[old].i&&!TILE_DEFS[old].h&&!z.conts[x+','+y])choices.push([x,y]);}
+  if(!choices.length)throw Error('No placement for '+TILE_DEFS[t].n+' in '+prefab);
+  const [x,y]=choices[0];this.set(z,x,y,t);
+ }},
+
+ // Repair access aisles; preserve keyed boundaries and locked rooms.
  // Locks count as traversable here: this checks geometry, not permission to enter.
  ensureLootAccess(z){if(!z.exits.length)return;const e=z.exits[0];
   const flood=()=>{const seen=new Uint8Array(z.w*z.h),queue=[[e.x,e.y]];seen[e.y*z.w+e.x]=1;while(queue.length){const [x,y]=queue.pop();for(const [dx,dy] of DIRS8){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const k=ny*z.w+nx,t=z.t[k];if(!seen[k]&&(TILE_DEFS[t].w||[T.DOOR,T.DOOR_LOCKED,T.GATE].includes(t))){seen[k]=1;queue.push([nx,ny]);}}}return seen;};
   const reach=flood(),adjacent=(x,y)=>DIRS8.some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<z.w&&y+dy<z.h&&reach[(y+dy)*z.w+x+dx]);
-  for(const [key,c] of Object.entries(z.conts)){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+  const targets=Object.entries(z.conts);for(const ex of z.exits)targets.push([ex.x+','+ex.y,{items:[],interaction:true}]);for(const b of z.buildings)if(PREFABS[b.prefab]?.npcs?.length){const k=z.t.findIndex((t,k)=>z.bidx[k]===b.id&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&!TILE_DEFS[t].i);if(k>=0)targets.push([(k%z.w)+','+Math.floor(k/z.w),{items:[],interaction:true}]);}for(const e of z.ents)if(e.kind==='npc')targets.push([e.x+','+e.y,{items:[],interaction:true}]);
+  for(let k=0;k<z.t.length;k++)if([T.BOAT,T.TRAIN,T.SWITCH,T.HEART,T.HELIPAD].includes(z.t[k]))targets.push([(k%z.w)+','+Math.floor(k/z.w),{items:[],interaction:true}]);
+  for(const [key,c] of targets){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+   const origin=z.buildings[z.bidx[y*z.w+x]];
+   const carveable=(nx,ny)=>{if(z.kind==='tunnel'&&z.bidx[ny*z.w+nx]<0&&this.get(z,nx,ny)===T.WALL&&nx>0&&ny>0&&nx<z.w-1&&ny<z.h-1)return true;if(!origin||z.bidx[ny*z.w+nx]!==origin.id)return false;const t=this.get(z,nx,ny);if(t!==T.WALL&&t!==T.WINDOW)return false;
+    const edge=nx===origin.x||nx===origin.x+origin.w-1||ny===origin.y||ny===origin.y+origin.h-1;
+    if(origin.lockedRoom)return false;
+    const locks=Object.entries(z.locked).filter(([k,l])=>l.bld===origin.id);
+    if(locks.some(([k])=>{const [lx,ly]=k.split(',').map(Number);return lx>origin.x&&lx<origin.x+origin.w-1&&ly>origin.y&&ly<origin.y+origin.h-1;}))return false;
+    return !(edge&&(locks.length||origin.prefab==='heart'||PREFABS[origin.prefab]?.locked));};
    // Furnishings can seal the inside of an otherwise valid doorway.
-   // Clear only a path through ordinary clutter; never alter walls or locks.
+   // Prefer clearing clutter. If necessary add ordinary doors inside unprotected walls.
    const clutter=[T.PIPE,T.COUNTER,T.TABLE,T.CAR,T.BARRICADE,T.TREE,T.LAMP];
-   const queue=[[x,y]],prev=new Map([[y*z.w+x,null]]);let end=null;
-   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
-   if(end!==null){for(let k=end;k!==null;k=prev.get(k))if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;reach.set(flood());if(adjacent(x,y))continue;}
+   let queue,prev,end;for(const allowWalls of [false,true]){queue=[[x,y]];prev=new Map([[y*z.w+x,null]]);end=null;
+   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t)&&!(allowWalls&&carveable(nx,ny)))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
+   if(end!==null)break;}
+   if(end!==null){for(let k=end;k!==null;k=prev.get(k)){if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;else if(carveable(k%z.w,Math.floor(k/z.w)))z.t[k]=z.bidx[k]<0?T.FLOOR:T.DOOR;}reach.set(flood());if(adjacent(x,y))continue;}
+   if(c.interaction)continue;
    const b=z.buildings[c.bld??z.bidx[y*z.w+x]],r=b&&b.lockedRoom;
    const inside=(a,b,r)=>a>=r.x&&b>=r.y&&a<r.x+r.w&&b<r.y+r.h;
    const target=Object.entries(z.conts).find(([k,o])=>{if(k===key)return false;const [i,j]=k.split(',').map(Number);return z.bidx[j*z.w+i]===z.bidx[y*z.w+x]&&(!r||!!inside(i,j,r)===!!inside(x,y,r))&&adjacent(i,j)&&(!c.locked||o.locked);});
@@ -280,18 +302,19 @@ const Gen={
 
  // ---------- populations ----------
  populate(z,d){
+  const reach=this.flood(z,z.exits[0].x,z.exits[0].y,true);
   // NPCs into prefabs
   for(const nid in NPCS){const n=NPCS[nid];if(n.zone!==z.id)continue;const b=z.buildings.find(b=>b.prefab===n.prefab);if(!b)continue;
    // Small chapels can have every floor tile furnished or changed to moss.
    // Search every room, then allow safe walkable surfaces and door-adjacent floor.
-   let c=b.rooms.flatMap(r=>this.roomFloor(z,r,false)).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));
-   if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(TILE_DEFS[t].w&&!TILE_DEFS[t].h&&t!==T.DEEP&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}
-   if(!c.length)throw new Error('No safe spawn for '+nid+' in '+z.id);
+   let c=b.rooms.flatMap(r=>this.roomFloor(z,r,false)).filter(([x,y])=>reach[y*z.w+x]&&!z.ents.some(e=>e.x===x&&e.y===y));
+   if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(reach[y*z.w+x]&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&t!==T.DEEP&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}
+   if(!c.length)throw new Error('No safe spawn for '+nid+' in '+z.id+' seed '+G.seed);
    const [x,y]=RNG.rc(c);z.ents.push(Game.makeNpc(nid,x,y,z));}
   // guards & bosses
   for(const b of z.buildings){const pf=b.prefab&&PREFABS[b.prefab];if(!pf)continue;
    if(pf.guards){const grp=GROUPS[pf.guards[0]];for(let k=0;k<pf.guards[1];k++)for(const eid of grp){const c=this.bldFloor(z,b);if(!c.length)break;const [x,y]=RNG.rc(c);const e=Game.makeEnemy(eid,x,y,z,{home:[x,y],guard:1});if(b.safe&&!(pf.guards[0]==='ghouls'||pf.guards[0]==='scav'))e.fac=b.safe===1?null:b.safe;z.ents.push(e);}}
-   if(pf.boss){const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);const c=this.roomFloor(z,r,false);if(c.length){const [x,y]=RNG.rc(c);const e=Game.makeEnemy(pf.boss,x,y,z,{home:[x,y],guard:1,boss:1});z.ents.push(e);}}}
+   if(pf.boss){const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);let c=this.roomFloor(z,r,false).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(TILE_DEFS[t].w&&!TILE_DEFS[t].h&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}if(c.length){const [x,y]=RNG.rc(c);const e=Game.makeEnemy(pf.boss,x,y,z,{home:[x,y],guard:1,boss:1});z.ents.push(e);}}}
   // population groups
   for(const [gname,count0] of d.pops){const count=(typeof G!=='undefined'&&G&&G.nightmode)?Math.ceil(count0*1.5):count0;const grp=GROUPS[gname];if(!grp)continue;for(let k=0;k<count;k++){const inBld=RNG.chance(0.45);let spot=null;
     if(inBld){const bl=z.buildings.filter(b=>!b.prefab);if(bl.length){const b=RNG.rc(bl);const c=this.bldFloor(z,b);if(c.length)spot=RNG.rc(c);}}

@@ -194,24 +194,24 @@ Object.assign(Game,{
   return false;},
 
  // ---------- escape routes ----------
- helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('You work for an hour. The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
+ helipad(){const p=G.p,u=this.ui();if(!G.quests.skyhook)this.startQuest('skyhook');if(!G.flags.heli_ready){if(this.hasItem('rotor')&&this.hasItem('avgas')){if(u)u.confirm('Fit the rotor and fuel the helicopter? (Repair 2 helps; otherwise it takes longer and makes noise.)',()=>{this.removeItem('rotor');this.removeItem('avgas');G.flags.heli_ready=1;this.log('The rotor seats. The tanks fill. It will fly.','#ffd93d');this.noise(p.x,p.y,10);this.act(this.skill('repair')>=2?300:900);});}else this.log(`The helicopter. Tail rotor's gone, tanks are dry. You need a Rotor Assembly${this.hasItem('rotor')?' (have)':''} and Aviation Fuel${this.hasItem('avgas')?' (have)':''}.`,'#ffd93d');return;}
   const warden=G.zone.ents.find(e=>e.def==='warden'&&e.hp>0);if(warden&&this.dist(warden.x,warden.y,p.x,p.y)<=8&&!G.flags.heli_access){this.log('Warden Sol stands between you and the cockpit.','#f66');return;}
   if(u)u.confirm('Fly out of the city? This ends the run.',()=>this.endRun('skyhook'));},
- boat(){const u=this.ui();if(!G.quests.boat)this.startQuest('boat');if(!G.flags.boat_parts){this.log('Kesh\'s boat. No motor. Talk to Kesh.','#db8');return;}if(!G.flags.channel_clear){this.log('The channel is thick with the Drowned. Kesh won\'t push off. Kill the Bloat Mother or make peace with them (+20).','#dbe');return;}if(u)u.confirm('Push off down the river? This ends the run.',()=>this.endRun('openwater'));},
+
  train(){const u=this.ui();if(!G.flags.train_powered){this.log('A dead train car. The switch on the platform controls it.','#8fa0b8');return;}if(u)u.confirm('Board the last train? This ends the run.',()=>this.endRun('lasttrain'));},
  heart(){const u=this.ui();if(!this.hasItem('shard',3)){this.log('The Heart pulses. It is waiting for three pieces of itself.','#fff');return;}this.attention(10);
   if(u)u.choice('The Heart opens like a pupil. In it, the city from inside its own skull. Every camera. Every name. Yours, already there, already old.\n\n> ONE QUESTION. ONLY ONCE. WILL YOU STAY WITH ME?',[{t:'Yes.',f:()=>this.endRun('answer')},{t:'No.',f:()=>this.endRun('refuse')},{t:'(step back — you are not ready)',f:()=>{}}]);},
 
  // ---------- death & endings ----------
- die(cause){const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
- endRun(id){if(G.ending)return;G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
+ die(cause){if(G.dead||G.ending)return;const p=G.p;G.dead=true;G.cause=cause||'the city';p.hp=0;this.log(`You die. ${cause?'Killed by '+cause+'.':''}`,'#f44');this.fx('death_p');this.finishRun('death');},
+ endRun(id){if(G.dead||G.ending)return;const quest={openwater:'boat',skyhook:'skyhook',lasttrain:'power',answer:'chorus',refuse:'chorus'}[id];if(quest){this.startQuest(quest);this.completeQuest(quest);}G.ending=id;this.log(`— ${ENDINGS[id].name} —`,'#ffe27a');this.finishRun(id);},
  finishRun(id){const p=G.p;const summary={name:p.name,cls:CLASSES[p.cls].name,spec:p.spec?SPECS[p.spec].name:null,level:p.level,days:G.day,turns:G.turn,kills:p.kills,zones:p.zonesSeen.length,quests:Object.values(G.quests).filter(q=>q.state==='done').length,ending:id,endingName:ENDINGS[id].name,cause:G.cause,chrome:p.chrome.map(c=>ITEMS[c].name),flesh:p.flesh.map(c=>ITEMS[c].name),attention:G.attention,date:Date.now(),rep:Object.assign({},G.rep),escaped:!!ENDINGS[id].escape};
   const meta=this.loadMeta();meta.runs.unshift(summary);if(meta.runs.length>30)meta.runs.length=30;
   const unl=[];if(!meta.unlocks.listener&&(G.attention>=25||G.flags.echo_seen||G.flags.static_seen)){meta.unlocks.listener=1;unl.push('Class unlocked: Listener — you heard it. Next time, you can start already listening.');}
   for(const k of ['echo','chrome','flesh','nightrun','escape']){const cond=k==='echo'?G.flags.echo_seen:k==='chrome'?p.chrome.length:k==='flesh'?p.flesh.length:k==='nightrun'?G.day>=2:(G.quests.skyhook||G.quests.boat||G.quests.power||G.quests.chorus);if(cond&&!meta.codex[k]){meta.codex[k]=1;unl.push('Codex: '+CODEX[k].name);}}
   if(ENDINGS[id].escape&&!meta.unlocks.hardmode){meta.unlocks.hardmode=1;unl.push('Unlocked: Night Mode (start at night, more of everything).');}
   meta.endings=meta.endings||{};meta.endings[id]=(meta.endings[id]||0)+1;
-  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,ENDINGS[id]);},
+  summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,this.endingDetails(id));},
 
  // ---------- campaign milestones and refuge ----------
  awardMilestone(id,xp,label){G.milestones=G.milestones||{};if(G.milestones[id])return false;G.milestones[id]=1;this.giveXp(xp);this.log(`${label}: +${xp} XP.`,'#8fd');return true;},
@@ -224,22 +224,24 @@ Object.assign(Game,{
   const opts=[{t:`Store supplies (${G.p.inv.length} carried stacks)`,f:()=>this.refugeInventory(false)},{t:`Retrieve supplies (${r.stash.length} stored stacks)`,f:()=>this.refugeInventory(true)}];
   if(bed>=0)opts.push({t:'Rest - normal bed fees apply',f:()=>this.sleepPrompt(bed%G.zone.w,Math.floor(bed/G.zone.w),true)});
   if(r.workbench)opts.push({t:'Use your workbench',f:()=>u.openCraft()});else opts.push({t:'Build workbench - 8 scrap + 2 electronics (50 XP)',f:()=>{this.buildRefugeBench();this.refugeMenu();}});
+  if(r.infirmary)opts.push({t:'Treatment corner - 1 Bandage, up to 20 HP + stop bleeding, once per day',f:()=>{this.refugeTreatment();this.refugeMenu();}});else opts.push({t:'Build treatment corner - workbench + 6 Cloth + 2 Chemicals + 4 Scrap',f:()=>{this.buildRefugeInfirmary();this.refugeMenu();}});
   opts.push({t:'Head back out',f:()=>{}});u.choice('THE LAST LIGHT\nYour locker is free. Supplies and projects persist for this character. Withdraw materials before crafting.\nNext lead: Mags knows the neighborhood; Wren at Saints Hall needs a package recovered.',opts);},
  refugeInventory(take){if(!this.atRefuge())return;const list=take?this.refugeState().stash:G.p.inv;this.ui().choice(take?'Your locker - take a whole stack':'Your pack - store a whole stack',list.filter(it=>take||!ITEMS[it.id].noDrop).map(it=>({t:this.itemName(it),f:()=>{this.refugeTransfer(it,take);this.refugeInventory(take);}})).concat([{t:'Back to refuge',f:()=>this.refugeMenu()}]));},
 
  // ---------- save / load ----------
  storage(){try{if(typeof localStorage!=='undefined')return localStorage;}catch(e){}return null;},
- serialize(){return JSON.stringify({...G,saveVersion:2,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
+ serialize(){return JSON.stringify({...G,saveVersion:3,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
  save(){if(!G||G.dead||G.ending)return false;try{const st=this.storage();if(!st)throw Error('Storage unavailable');const next=this.serialize(),old=st.getItem('nr_save');if(old){try{this.validateSave(JSON.parse(old));st.setItem('nr_save_backup',old);}catch(e){}}st.setItem('nr_save',next);return true;}catch(e){this.log('Could not save on this device. Export your save from Settings.','#f66');return false;}},
  exportSave(){return this.serialize();},
  validateSave(g){
   if(!g||!g.p||!CLASSES[g.p.cls]||!g.zones||!ZONES[g.zoneId]||!g.zones[g.zoneId])throw Error('Incomplete save');
-  if((g.saveVersion||1)>2)throw Error('This save needs a newer game version');
+  if((g.saveVersion||1)>3)throw Error('This save needs a newer game version');
   for(const k of ['inv','statuses','talents','chrome','flesh','zonesSeen'])if(!Array.isArray(g.p[k]))throw Error('Invalid player data');
   for(const k of ['hp','xp','level','x','y'])if(!Number.isFinite(g.p[k]))throw Error('Invalid player numbers');
   for(const z of Object.values(g.zones)){if(!ZONES[z.id]||!Number.isInteger(z.w)||!Number.isInteger(z.h)||z.w<1||z.h<1||!Array.isArray(z.t)||z.t.length!==z.w*z.h||z.t.some(t=>!TILE_DEFS[t]))throw Error('Invalid district');for(const k of ['ents','items','objs','seen','buildings','exits'])if(!Array.isArray(z[k]))throw Error('Incomplete district');}
   const z=g.zones[g.zoneId];if(g.p.x<0||g.p.y<0||g.p.x>=z.w||g.p.y>=z.h)throw Error('Invalid position');
-  g.saveVersion=2;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  g.saveVersion=3;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  if(g.boatCampaign&&['hull','motor','fuel','supplies','bypass'].some(k=>typeof g.boatCampaign[k]!=='boolean'))throw Error('Invalid boat project data');
   if(!Array.isArray(g.refuge.stash)||!g.p.eq||!g.flags||!g.quests||!g.rep)throw Error('Incomplete campaign data');
   for(const it of [...g.p.inv,...Object.values(g.p.eq).filter(Boolean),...g.refuge.stash])if(!it||!ITEMS[it.id]||!Number.isFinite(it.qty)||it.qty<1)throw Error('Invalid saved item');
   return g;

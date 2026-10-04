@@ -1,7 +1,7 @@
 // Deterministic regressions for the first reliability pass. Run: node regression-test.js
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const mem=new Map();const ctx={console,assert,localStorage:{getItem:k=>mem.get(k)||null,setItem:(k,v)=>mem.set(k,v),removeItem:k=>mem.delete(k)}};
-vm.createContext(ctx);vm.runInContext(['data.js','content.js','gen.js','engine.js','engine2.js'].map(f=>fs.readFileSync(__dirname+'/'+f,'utf8')).join('\n'),ctx);
+vm.createContext(ctx);vm.runInContext(['data.js','content.js','gen.js','engine.js','engine2.js','campaign.js'].map(f=>fs.readFileSync(__dirname+'/'+f,'utf8')).join('\n'),ctx);
 vm.runInContext(`
 for(let seed=1;seed<=500;seed++){
  Game.newGame('Generation','soldier',seed);

@@ -280,6 +280,7 @@ function paneQuest(pane){
  el('div','small',pane,'Use a bed at the Last Light in Ashgrove to access your locker, rest, or build a workbench. Stored items stay here for this run.');
  if(Game.atRefuge())el('button','btn',pane,'Open refuge').onclick=()=>Game.refugeMenu();
 
+ if(G.quests.boat){el('div','sec',pane,'Boat preparations');for(const step of Game.boatChecklist())el('div','small',pane,(step.done?'Ready: ':'Needed: ')+step.text);if(Game.boatSite())el('button','btn',pane,'Work on the boat').onclick=()=>Game.boat();}
  const ids=Object.keys(G.quests);
  const act=ids.filter(i=>G.quests[i].state==='active'),done=ids.filter(i=>G.quests[i].state!=='active');
  if(!ids.length)el('div','muted',pane,'No leads yet. People talk. Listen.');
@@ -427,6 +428,7 @@ const UI={
    case 'glitch':Sound.play('echo');break;case 'levelup':Sound.play('level');toast('Level up! Spend your points in Character (C).','#ffe27a');break;case 'quest':Sound.play('quest');break;
    case 'zone':Sound.play('zone');break;case 'reload':Sound.play('reload');break;case 'shake':Sound.play('boom');break;}},
  confirm(text,yes){confirmBox(text,yes);},
+ clearNotifications(){clearToasts();},
  choice(text,opts){modal(box=>{el('div','mtext',box,esc(text));const o=el('div','opts',box);for(const op of opts){if(op.cond&&!op.cond())continue;const b=el('button','opt',o,esc(op.t));b.onclick=()=>{closeModal();op.f&&op.f();refresh();};}},{noClose:true});},
  openLoot(c,x,y){const draw=()=>{if(!c.items.length){closeModal();refresh();return;}modal(box=>{el('h3',null,box,esc(c.kind[0].toUpperCase()+c.kind.slice(1)));el('div','muted small',box,`Pack ${Game.totalWeight()} / ${G.p.d.carry} kg`);
    const o=el('div','loot',box);for(const it of c.items.slice()){const d=ITEMS[it.id];const r=el('div','loot-row',o,`${icon(it.id,28)}<div class="grow"><b style="color:${d.col}">${esc(Game.itemName(it))}</b><div class="muted small">${esc(d.desc)}</div></div><span class="muted small">${(d.wt*(it.qty||1)).toFixed(1)}kg</span>`);r.onclick=()=>{if(Game.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}draw();};}

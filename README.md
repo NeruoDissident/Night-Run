@@ -24,6 +24,7 @@ A procedural cyberpunk survival roguelike that runs in the browser. One person, 
 | `content.js` | Quests, dialogue trees, events, endings |
 | `gen.js` | Procedural generation (streets, buildings, tunnels, mall, exits, population) |
 | `engine.js`, `engine2.js` | Game rules: turns, FOV, items, progression, factions, combat, AI, abilities, endings, saves |
+| `campaign.js` | Boat projects, passage choices, refuge treatment and boat ending variants |
 | `render.js` | Sprite renderer, lighting, effects |
 | `audio.js` | WebAudio-synthesized ambience, music and SFX |
 | `ui.js` | Screens, panels, modals, input |
@@ -38,6 +39,9 @@ node build.js                   # writes index.html
 node test.js                    # engine smoke test
 node regression-test.js         # seeded NPC generation and combat/save regressions
 node audio-test.js              # audio scheduling, mute, and lifecycle regressions
+node foundation-test.js         # 500-city access/fixture/NPC/loot invariants and save/refuge checks
+node route-test.js              # controlled full route logic, not combat playthroughs
+node expedition-test.js         # exploratory normal-action runs; reports progress and failures
 ```
 
 ## Campaign foundation update
@@ -48,3 +52,11 @@ node audio-test.js              # audio scheduling, mute, and lifecycle regressi
 - Run `node foundation-test.js` for campaign, save, refuge and 500-city geometry checks.
 
 See CAMPAIGN_PLAN.md for remaining work and test limitations.
+
+## Boat campaign update
+- Prepare hull, motor, fuel and provisions separately at Kesh's boat or shack. Each delivery saves its progress. Paid and salvage alternatives support different builds.
+- Secure passage through Drowned goodwill (+20), defeating the Mother, or a decoy beacon (Repair/Hacking 3, 3 electronics, 2 wire). The ending reflects the route and Kesh's availability.
+- After building the Last Light workbench, build a treatment corner with 6 Cloth, 2 Chemicals and 4 Scrap. Once per game day, one Bandage restores up to 20 HP and stops bleeding.
+- Friendly faction guards can be asked to move aside. The original first conversation with Mags is available again.
+- Dace's cell delivery now supplies the mechanic promised for the train switch. Helicopter journal progress survives installing the parts. Escape quests complete before ending summaries.
+- Save format 3 reads previous formats; previously assembled boats retain their completed preparation. Generation repairs apply to newly generated districts, not already visited maps in saves.

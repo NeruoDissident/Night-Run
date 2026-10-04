@@ -1,6 +1,6 @@
 // Headless smoke test: loads the game files, creates runs for every class, plays random turns, exercises systems.
 const fs=require('fs'),vm=require('vm');
-const src=['data.js','content.js','gen.js','engine.js','engine2.js'].map(f=>fs.readFileSync(__dirname+'/'+f,'utf8')).join('\n');
+const src=['data.js','content.js','gen.js','engine.js','engine2.js','campaign.js'].map(f=>fs.readFileSync(__dirname+'/'+f,'utf8')).join('\n');
 const ctx={console,localStorage:(()=>{const m={};return{getItem:k=>m[k]||null,setItem:(k,v)=>{m[k]=String(v);},removeItem:k=>{delete m[k];}};})()};
 vm.createContext(ctx);
 ctx.UI={onLog(){},refresh(){},fx(){},confirm(m,f){f&&f();},choice(t,o){const x=o.find(a=>a.f)||o[0];x.f&&x.f();},openLoot(c){for(const it of c.items.slice()){c.items.splice(c.items.indexOf(it),1);}},openTrade(){},openInstall(){},showDialogue(e,node){ctx.lastNode=node;},closeDialogue(){},targetMode(){},openCraft(){},showEnd(s){ctx.ended=s;}};
