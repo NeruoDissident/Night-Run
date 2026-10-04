@@ -158,7 +158,7 @@ Object.assign(Game,{
  wander(e,home,r){const d=this.rc(DIRS8);const nx=e.x+d[0],ny=e.y+d[1];if(this.walkableFor(nx,ny)&&this.dist(nx,ny,home[0],home[1])<=r&&this.tile(nx,ny)!==T.EXIT&&!this.inSafeDifferent(e,nx,ny)&&TILE_DEFS[this.tile(nx,ny)].h===undefined){e.x=nx;e.y=ny;}},
  inSafeDifferent(e,x,y){const s=this.inSafe(x,y);return s&&e.kind==='e'&&HOSTILE_FACTIONS[e.fac];},
  stepToward(e,tx,ty){const z=G.zone;let best=null,bd=this.dist(e.x,e.y,tx,ty)+0.5,bs=this.edist(e.x,e.y,tx,ty);const dirs=RNG.shuffle(DIRS8.slice());
-  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!ENEMIES[e.def].tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
+  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!this.entityCombatDef(e).tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
   if(!best){// try BFS a few steps for corners
    const path=this.bfs(e.x,e.y,tx,ty,e);if(path&&path.length>1){best=path[1];}}
   if(!best)return false;const t=this.tile(best[0],best[1]);if(t===T.DOOR){Gen.set(z,best[0],best[1],T.DOOR_OPEN);return true;}e.x=best[0];e.y=best[1];return true;},
@@ -213,14 +213,43 @@ Object.assign(Game,{
   meta.endings=meta.endings||{};meta.endings[id]=(meta.endings[id]||0)+1;
   summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,ENDINGS[id]);},
 
+ // ---------- campaign milestones and refuge ----------
+ awardMilestone(id,xp,label){G.milestones=G.milestones||{};if(G.milestones[id])return false;G.milestones[id]=1;this.giveXp(xp);this.log(`${label}: +${xp} XP.`,'#8fd');return true;},
+ atRefuge(){return !!(G&&!G.dead&&!G.ending&&G.zoneId==='ashgrove'&&this.buildingAt(G.p.x,G.p.y)?.prefab==='bar'&&this.inSafe(G.p.x,G.p.y));},
+ refugeState(){return G.refuge||(G.refuge={stash:[],workbench:false});},
+ refugeTransfer(inst,take){if(!this.atRefuge())return false;const r=this.refugeState(),src=take?r.stash:G.p.inv;if(!src.includes(inst))return false;if(!take&&ITEMS[inst.id].noDrop)return false;
+  if(take){if(!this.addItemChecked({...inst,mods:inst.mods&&inst.mods.slice()}))return false;src.splice(src.indexOf(inst),1);}else{src.splice(src.indexOf(inst),1);r.stash.push(inst);this.log(`Stored ${this.itemName(inst)} at the Last Light.`,'#8fd');this.computeDerived();}this.save();return true;},
+ buildRefugeBench(){if(!this.atRefuge()||this.refugeState().workbench)return false;if(this.countItem('scrap')<8||this.countItem('electronics')<2){this.log('Need 8 scrap and 2 electronics in your pack.','#fd8');return false;}this.removeItem('scrap',8);this.removeItem('electronics',2);this.refugeState().workbench=true;this.awardMilestone('refuge:bench',50,'Last Light workbench completed');this.log('A working bench. One more reason to come home.','#8fd');this.save();return true;},
+ refugeMenu(x,y){if(!this.atRefuge())return;const u=this.ui();if(!u)return;const r=this.refugeState();const bed=G.zone.t.findIndex((t,i)=>t===T.BED&&this.buildingAt(i%G.zone.w,Math.floor(i/G.zone.w))?.prefab==='bar');
+  const opts=[{t:`Store supplies (${G.p.inv.length} carried stacks)`,f:()=>this.refugeInventory(false)},{t:`Retrieve supplies (${r.stash.length} stored stacks)`,f:()=>this.refugeInventory(true)}];
+  if(bed>=0)opts.push({t:'Rest - normal bed fees apply',f:()=>this.sleepPrompt(bed%G.zone.w,Math.floor(bed/G.zone.w),true)});
+  if(r.workbench)opts.push({t:'Use your workbench',f:()=>u.openCraft()});else opts.push({t:'Build workbench - 8 scrap + 2 electronics (50 XP)',f:()=>{this.buildRefugeBench();this.refugeMenu();}});
+  opts.push({t:'Head back out',f:()=>{}});u.choice('THE LAST LIGHT\nYour locker is free. Supplies and projects persist for this character. Withdraw materials before crafting.\nNext lead: Mags knows the neighborhood; Wren at Saints Hall needs a package recovered.',opts);},
+ refugeInventory(take){if(!this.atRefuge())return;const list=take?this.refugeState().stash:G.p.inv;this.ui().choice(take?'Your locker - take a whole stack':'Your pack - store a whole stack',list.filter(it=>take||!ITEMS[it.id].noDrop).map(it=>({t:this.itemName(it),f:()=>{this.refugeTransfer(it,take);this.refugeInventory(take);}})).concat([{t:'Back to refuge',f:()=>this.refugeMenu()}]));},
+
  // ---------- save / load ----------
  storage(){try{if(typeof localStorage!=='undefined')return localStorage;}catch(e){}return null;},
- serialize(){G.rngs=RNG.s;const z=G.zone;G.zone=null;const s=JSON.stringify(G,(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);G.zone=z;return s;},
- save(){if(!G||G.dead||G.ending)return;try{const st=this.storage();if(st)st.setItem('nr_save',this.serialize());}catch(e){}},
+ serialize(){return JSON.stringify({...G,saveVersion:2,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
+ save(){if(!G||G.dead||G.ending)return false;try{const st=this.storage();if(!st)throw Error('Storage unavailable');const next=this.serialize(),old=st.getItem('nr_save');if(old){try{this.validateSave(JSON.parse(old));st.setItem('nr_save_backup',old);}catch(e){}}st.setItem('nr_save',next);return true;}catch(e){this.log('Could not save on this device. Export your save from Settings.','#f66');return false;}},
  exportSave(){return this.serialize();},
- load(str){try{const st=this.storage();const s=str||(st&&st.getItem('nr_save'));if(!s)return false;const g=JSON.parse(s);if(!g||!g.p)return false;G=g;RNG.seed(G.rngs||G.seed);RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];G.zone.def=ZONES[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();return true;}catch(e){console.error(e);return false;}},
- hasSave(){const st=this.storage();return !!(st&&st.getItem('nr_save'));},
- clearSave(){try{const st=this.storage();if(st)st.removeItem('nr_save');}catch(e){}},
+ validateSave(g){
+  if(!g||!g.p||!CLASSES[g.p.cls]||!g.zones||!ZONES[g.zoneId]||!g.zones[g.zoneId])throw Error('Incomplete save');
+  if((g.saveVersion||1)>2)throw Error('This save needs a newer game version');
+  for(const k of ['inv','statuses','talents','chrome','flesh','zonesSeen'])if(!Array.isArray(g.p[k]))throw Error('Invalid player data');
+  for(const k of ['hp','xp','level','x','y'])if(!Number.isFinite(g.p[k]))throw Error('Invalid player numbers');
+  for(const z of Object.values(g.zones)){if(!ZONES[z.id]||!Number.isInteger(z.w)||!Number.isInteger(z.h)||z.w<1||z.h<1||!Array.isArray(z.t)||z.t.length!==z.w*z.h||z.t.some(t=>!TILE_DEFS[t]))throw Error('Invalid district');for(const k of ['ents','items','objs','seen','buildings','exits'])if(!Array.isArray(z[k]))throw Error('Incomplete district');}
+  const z=g.zones[g.zoneId];if(g.p.x<0||g.p.y<0||g.p.x>=z.w||g.p.y>=z.h)throw Error('Invalid position');
+  g.saveVersion=2;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  if(!Array.isArray(g.refuge.stash)||!g.p.eq||!g.flags||!g.quests||!g.rep)throw Error('Incomplete campaign data');
+  for(const it of [...g.p.inv,...Object.values(g.p.eq).filter(Boolean),...g.refuge.stash])if(!it||!ITEMS[it.id]||!Number.isFinite(it.qty)||it.qty<1)throw Error('Invalid saved item');
+  return g;
+ },
+ load(str){const previous=G,rs=RNG.s;this.loadError='';const st=this.storage();let candidates;
+  try{candidates=str!==undefined?[str]:[st&&st.getItem('nr_save'),st&&st.getItem('nr_save_backup')];}catch(e){this.loadError='Device storage is unavailable.';return false;}
+  for(let i=0;i<candidates.length;i++){if(!candidates[i])continue;try{const g=this.validateSave(JSON.parse(candidates[i]));G=g;RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();if(i>0)this.log('Recovered the previous autosave. Your most recent actions may be missing.','#fd8');return true;}catch(e){G=previous;RNG.s=rs;this.loadError=e.message;}}
+  return false;},
+ hasSave(){try{const st=this.storage();return !!(st&&(st.getItem('nr_save')||st.getItem('nr_save_backup')));}catch(e){return false;}},
+ clearSave(){try{const st=this.storage();if(st){st.removeItem('nr_save');st.removeItem('nr_save_backup');}}catch(e){}},
  loadMeta(){try{const st=this.storage();const s=st&&st.getItem('nr_meta');if(s)return Object.assign({runs:[],unlocks:{},codex:{},settings:{}},JSON.parse(s));}catch(e){}return{runs:[],unlocks:{},codex:{},settings:{}};},
  saveMeta(m){try{const st=this.storage();if(st)st.setItem('nr_meta',JSON.stringify(m));}catch(e){}}
 });

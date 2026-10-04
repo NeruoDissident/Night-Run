@@ -24,6 +24,7 @@ const Gen={
   if(d.kind==='static')this.glitch(z);
   this.placeExits(z,d);
   this.decorate(z,d);
+  this.ensureLootAccess(z);
   this.populate(z,d);
   return z;},
 
@@ -235,6 +236,25 @@ const Gen={
     if(best){let x=best[0],y=best[1],n=0;while(n++<250&&z.bidx[y*z.w+x]!==b.id){if(Math.abs(bx-x)>Math.abs(by-y))x+=Math.sign(bx-x);else y+=Math.sign(by-y);const t=this.get(z,x,y);if(!this.walk(z,x,y)&&t!==T.DOOR&&t!==T.DOOR_LOCKED){const bi=z.bidx[y*z.w+x];if(bi>=0){const ob=z.buildings[bi];const onEdge=x===ob.x||x===ob.x+ob.w-1||y===ob.y||y===ob.y+ob.h-1;if(bi===b.id&&onEdge&&z.locked[x+','+y]===undefined&&(PREFABS[b.prefab]||{}).locked){this.set(z,x,y,T.DOOR_LOCKED);z.locked[x+','+y]={key:PREFABS[b.prefab].locked===1?null:PREFABS[b.prefab].locked,diff:6,bld:b.id};}else this.set(z,x,y,onEdge?T.DOOR:T.FLOOR);}else this.set(z,x,y,z.kind==='tunnel'?T.FLOOR:T.RUBBLE);}}
      const r3=this.flood(z,seeds[0].x,seeds[0].y);for(let i=0;i<r3.length;i++)reach[i]=r3[i];}}}},
  flood(z,sx,sy){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
+
+ // Move isolated loot inside its original building/locked room without changing geometry.
+ // Locks count as traversable here: this checks geometry, not permission to enter.
+ ensureLootAccess(z){if(!z.exits.length)return;const e=z.exits[0];
+  const flood=()=>{const seen=new Uint8Array(z.w*z.h),queue=[[e.x,e.y]];seen[e.y*z.w+e.x]=1;while(queue.length){const [x,y]=queue.pop();for(const [dx,dy] of DIRS8){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const k=ny*z.w+nx,t=z.t[k];if(!seen[k]&&(TILE_DEFS[t].w||[T.DOOR,T.DOOR_LOCKED,T.GATE].includes(t))){seen[k]=1;queue.push([nx,ny]);}}}return seen;};
+  const reach=flood(),adjacent=(x,y)=>DIRS8.some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<z.w&&y+dy<z.h&&reach[(y+dy)*z.w+x+dx]);
+  for(const [key,c] of Object.entries(z.conts)){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+   // Furnishings can seal the inside of an otherwise valid doorway.
+   // Clear only a path through ordinary clutter; never alter walls or locks.
+   const clutter=[T.PIPE,T.COUNTER,T.TABLE,T.CAR,T.BARRICADE,T.TREE,T.LAMP];
+   const queue=[[x,y]],prev=new Map([[y*z.w+x,null]]);let end=null;
+   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
+   if(end!==null){for(let k=end;k!==null;k=prev.get(k))if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;reach.set(flood());if(adjacent(x,y))continue;}
+   const b=z.buildings[c.bld??z.bidx[y*z.w+x]],r=b&&b.lockedRoom;
+   const inside=(a,b,r)=>a>=r.x&&b>=r.y&&a<r.x+r.w&&b<r.y+r.h;
+   const target=Object.entries(z.conts).find(([k,o])=>{if(k===key)return false;const [i,j]=k.split(',').map(Number);return z.bidx[j*z.w+i]===z.bidx[y*z.w+x]&&(!r||!!inside(i,j,r)===!!inside(x,y,r))&&adjacent(i,j)&&(!c.locked||o.locked);});
+   if(target){target[1].items.push(...c.items);c.items=[];}
+   else if(!c.locked){const spot=z.t.findIndex((t,k)=>reach[k]&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&z.bidx[k]===z.bidx[y*z.w+x]&&(!r||!!inside(k%z.w,Math.floor(k/z.w),r)===!!inside(x,y,r)));if(spot>=0){for(const it of c.items)z.items.push({...it,x:spot%z.w,y:Math.floor(spot/z.w)});c.items=[];}}
+  }},
 
  // ---------- decorations: lore text on graffiti/signs/terminals ----------
  decorate(z,d){for(let i=0;i<z.t.length;i++){const t=z.t[i];const x=i%z.w,y=(i/z.w)|0;const k=x+','+y;

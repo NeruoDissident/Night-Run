@@ -39,3 +39,12 @@ node test.js                    # engine smoke test
 node regression-test.js         # seeded NPC generation and combat/save regressions
 node audio-test.js              # audio scheduling, mute, and lifecycle regressions
 ```
+
+## Campaign foundation update
+- Last Light beds and the quest panel open your refuge while inside the bar: store and retrieve whole item stacks, rest, and build a permanent-for-this-run workbench (8 scrap + 2 electronics).
+- New runs start with A Foothold, pointing to Mags and Wren. First visits to other districts grant 35 XP. Level 4 now needs 360 cumulative XP rather than 840; later thresholds are unchanged.
+- Saves have a version and previous-autosave recovery. Settings can export a JSON backup; the title screen can import it. Death and endings clear both local autosaves.
+- Generation repairs clutter-blocked loot paths and relocates isolated loot within the same building/locked room where possible.
+- Run `node foundation-test.js` for campaign, save, refuge and 500-city geometry checks.
+
+See CAMPAIGN_PLAN.md for remaining work and test limitations.

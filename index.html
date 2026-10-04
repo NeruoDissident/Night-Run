@@ -632,6 +632,7 @@ const CODEX={
 // ---------- QUESTS ----------
 // stages: [{text, done(g)}]  reward applied on final completion. hidden quests start via flags.
 const QUESTS={
+ first_steps:{name:'A Foothold',fac:'saints',desc:'Start at the Last Light. Mags has local leads; Wren at Saints Hall offers work. Your locker is available through the beds.',stages:[{text:'Talk to Mags at the Last Light.',done:g=>g.flags.met_mags},{text:'Recover Wren\'s package from Delmar Apartments and return it to Wren at Saints Hall.',done:g=>g.flags.wren_package_done}],reward:{xp:40}},
  wren_package:{name:"Wren's Package",fac:'saints',desc:'Wren wants a package back from the Delmar Apartments stash. Scavs moved in after the Saints moved out.',
   stages:[{text:'Recover the package from the Delmar Apartments (Ashgrove).',done:g=>Game.hasItem('wren_package')},{text:'Bring it to Wren at Saints Hall.',done:g=>G.flags.wren_package_done}],
   reward:{xp:80,creds:60,rep:{saints:20}}},
@@ -882,6 +883,7 @@ const Gen={
   if(d.kind==='static')this.glitch(z);
   this.placeExits(z,d);
   this.decorate(z,d);
+  this.ensureLootAccess(z);
   this.populate(z,d);
   return z;},
 
@@ -1094,6 +1096,25 @@ const Gen={
      const r3=this.flood(z,seeds[0].x,seeds[0].y);for(let i=0;i<r3.length;i++)reach[i]=r3[i];}}}},
  flood(z,sx,sy){const r=new Uint8Array(z.w*z.h);const st=[[sx,sy]];r[sy*z.w+sx]=1;while(st.length){const [x,y]=st.pop();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const i=ny*z.w+nx;if(r[i])continue;const t=z.t[i];if(TILE_DEFS[t].w||t===T.DOOR||t===T.DOOR_LOCKED||t===T.GATE){r[i]=1;st.push([nx,ny]);}}}return r;},
 
+ // Move isolated loot inside its original building/locked room without changing geometry.
+ // Locks count as traversable here: this checks geometry, not permission to enter.
+ ensureLootAccess(z){if(!z.exits.length)return;const e=z.exits[0];
+  const flood=()=>{const seen=new Uint8Array(z.w*z.h),queue=[[e.x,e.y]];seen[e.y*z.w+e.x]=1;while(queue.length){const [x,y]=queue.pop();for(const [dx,dy] of DIRS8){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=z.w||ny>=z.h)continue;const k=ny*z.w+nx,t=z.t[k];if(!seen[k]&&(TILE_DEFS[t].w||[T.DOOR,T.DOOR_LOCKED,T.GATE].includes(t))){seen[k]=1;queue.push([nx,ny]);}}}return seen;};
+  const reach=flood(),adjacent=(x,y)=>DIRS8.some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<z.w&&y+dy<z.h&&reach[(y+dy)*z.w+x+dx]);
+  for(const [key,c] of Object.entries(z.conts)){const [x,y]=key.split(',').map(Number);if(adjacent(x,y))continue;
+   // Furnishings can seal the inside of an otherwise valid doorway.
+   // Clear only a path through ordinary clutter; never alter walls or locks.
+   const clutter=[T.PIPE,T.COUNTER,T.TABLE,T.CAR,T.BARRICADE,T.TREE,T.LAMP];
+   const queue=[[x,y]],prev=new Map([[y*z.w+x,null]]);let end=null;
+   for(let n=0;n<queue.length&&end===null;n++){const [cx,cy]=queue[n];for(const [dx,dy] of DIRS8){const nx=cx+dx,ny=cy+dy,k=ny*z.w+nx;if(nx<0||ny<0||nx>=z.w||ny>=z.h||prev.has(k))continue;const t=z.t[k];if(!TILE_DEFS[t].w&&![T.DOOR,T.DOOR_LOCKED,T.GATE,...clutter].includes(t))continue;prev.set(k,cy*z.w+cx);if(reach[k]){end=k;break;}queue.push([nx,ny]);}}
+   if(end!==null){for(let k=end;k!==null;k=prev.get(k))if(clutter.includes(z.t[k]))z.t[k]=T.FLOOR;reach.set(flood());if(adjacent(x,y))continue;}
+   const b=z.buildings[c.bld??z.bidx[y*z.w+x]],r=b&&b.lockedRoom;
+   const inside=(a,b,r)=>a>=r.x&&b>=r.y&&a<r.x+r.w&&b<r.y+r.h;
+   const target=Object.entries(z.conts).find(([k,o])=>{if(k===key)return false;const [i,j]=k.split(',').map(Number);return z.bidx[j*z.w+i]===z.bidx[y*z.w+x]&&(!r||!!inside(i,j,r)===!!inside(x,y,r))&&adjacent(i,j)&&(!c.locked||o.locked);});
+   if(target){target[1].items.push(...c.items);c.items=[];}
+   else if(!c.locked){const spot=z.t.findIndex((t,k)=>reach[k]&&TILE_DEFS[t].w&&!TILE_DEFS[t].h&&z.bidx[k]===z.bidx[y*z.w+x]&&(!r||!!inside(k%z.w,Math.floor(k/z.w),r)===!!inside(x,y,r)));if(spot>=0){for(const it of c.items)z.items.push({...it,x:spot%z.w,y:Math.floor(spot/z.w)});c.items=[];}}
+  }},
+
  // ---------- decorations: lore text on graffiti/signs/terminals ----------
  decorate(z,d){for(let i=0;i<z.t.length;i++){const t=z.t[i];const x=i%z.w,y=(i/z.w)|0;const k=x+','+y;
    if(t===T.GRAFFITI)z.terms[k]={kind:'graffiti',text:RNG.rc(GRAFFITI)};
@@ -1180,7 +1201,7 @@ const Game={
   this.enterZone('ashgrove',null);
   this.log(`${p.name} the ${cd.name} enters the fractured city. It is ${this.timeStr()}. Night falls at 20:00.`,'#fd8');
   this.log(cd.tag,'#aaa');this.log('Move with arrows/WASD/numpad, bump to attack or interact. Press ? for help.','#8f8');
-  this.save();return G;},
+  this.startQuest('first_steps');this.log('Your locker and refuge projects are available at the Last Light beds.','#8fd');this.save();return G;},
  makeItem(id,qty){const d=ITEMS[id];const it={id,qty:d.stack?(qty||1):1};if(d.dur)it.dur=d.dur;if(d.clip!==undefined)it.clip=0;if(d.charges)it.charges=d.charges;if(d.type==='weapon')it.mods=[];return it;},
 
  // ---------- derived stats ----------
@@ -1214,7 +1235,7 @@ const Game={
    const bar=z.buildings.find(b=>b.prefab==='bar');if(bar){const c=Gen.roomFloor(z,bar.rooms[0],false).filter(([x,y])=>!this.entAt(x,y));if(c.length)spot=c[0];}
    if(!spot&&z.exits.length){const ex=z.exits[0];const dir=ex.edge==='N'?[0,1]:ex.edge==='S'?[0,-1]:ex.edge==='W'?[1,0]:[-1,0];spot=this.freeNear(ex.x+dir[0],ex.y+dir[1],4)||[ex.x+dir[0],ex.y+dir[1]];}}
   p.x=spot[0];p.y=spot[1];
-  if(!z.visited){z.visited=1;p.zonesSeen.push(id);this.log(`— ${z.name} —`,'#fd8');this.log(z.def.tag,'#aaa');const dn=['','feels quiet. Mostly.','has teeth.','is dangerous. Move carefully.','is very dangerous. Every corner could be your last.','should not exist. Nothing here is safe.'][z.def.danger]||'';this.log(`This district ${dn}`,z.def.danger>=4?'#f66':'#ccc');this.fx('zone',z.name);this.pushAction('entered '+z.name);}
+  if(!z.visited){z.visited=1;p.zonesSeen.push(id);this.log(`— ${z.name} —`,'#fd8');this.log(z.def.tag,'#aaa');const dn=['','feels quiet. Mostly.','has teeth.','is dangerous. Move carefully.','is very dangerous. Every corner could be your last.','should not exist. Nothing here is safe.'][z.def.danger]||'';this.log(`This district ${dn}`,z.def.danger>=4?'#f66':'#ccc');this.fx('zone',z.name);this.pushAction('entered '+z.name);if(id!=='ashgrove')this.awardMilestone('district:'+id,35,'New district explored');}
   else{this.log(`You return to ${z.name}.`,'#fd8');const gap=G.turn-z.lastVisit;if(gap>480&&z.def.danger>=1){this.respawnRoamers(z,Math.min(3,Math.floor(gap/480)));}}
   this.recomputeLight();this.computeFov();this.checkZoneEntryFlags(id);this.save();},
  checkZoneEntryFlags(id){if(id==='static'&&!G.flags.static_seen){G.flags.static_seen=1;this.attention(5);this.echoMessage('arrive');}},
@@ -1364,7 +1385,7 @@ const Game={
    ...(p.eq.weapon&&['fireaxe','sledge'].includes(p.eq.weapon.id)?[{t:'Break it down',f:()=>{open();this.noise(x,y,10);this.act(200);}}]:[]),{t:'Leave it',f:()=>{}}]);},
  roll(pct){return this.ri(1,100)<=pct;},
  takeAll(c){for(const it of c.items.slice()){if(this.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}}},
- sleepPrompt(x,y){const u=this.ui();const safe=this.inSafe(x,y);const b=this.buildingAt(x,y);const barBed=b&&b.prefab==='bar';if(barBed&&G.flags.bar_bed!==G.day&&(G.rep.saints||0)<20){this.log('Mags\' beds. Ten creds, or Saints\' goodwill. Ask her.','#fd8');return;}
+ sleepPrompt(x,y,restOnly){if(!restOnly&&this.atRefuge()){this.refugeMenu(x,y);return;}const u=this.ui();const safe=this.inSafe(x,y);const b=this.buildingAt(x,y);const barBed=b&&b.prefab==='bar';if(barBed&&G.flags.bar_bed!==G.day&&(G.rep.saints||0)<20){this.log('Mags\' beds. Ten creds, or Saints\' goodwill. Ask her.','#fd8');return;}
   const hrs=[2,4,8];if(u)u.choice(safe?'A bed. Safe enough.':'A bed. Nowhere is safe. Something could find you.',hrs.map(h=>({t:`Sleep ${h} hours`,f:()=>this.sleep(h,!!safe)})).concat([{t:'Not now',f:()=>{}}]));},
  sleep(h,safe){const p=G.p;const turns=h*60;this.fx('fade');
   let woke=false;for(let i=0;i<h;i++){G.time+=60;G.turn+=60;p.fatigue=Math.max(0,p.fatigue-11);p.hunger=Math.min(120,p.hunger+3.5);p.hp=Math.min(p.d.maxhp,p.hp+Math.ceil(p.d.maxhp*0.05));p.stam=p.d.maxstam;
@@ -1438,7 +1459,7 @@ const Game={
  fullHeal(){const p=G.p;p.hp=p.d.maxhp;for(const s of p.statuses.slice())if(['bleed','fracture','burn','poison','infection','concussion','malfunction'].includes(s.id))this.removeStatus(s.id);},
 
  // ---------- progression ----------
- xpNeeded(l){return 60*l*l;},
+ xpNeeded(l){return l===1?60:l===2?120:l===3?180:60*l*l;},
  giveXp(n){const p=G.p;n=Math.round(n*(1+p.d.xp/100));p.xp+=n;while(p.xp>=this.xpNeeded(p.level)){p.xp-=this.xpNeeded(p.level);p.level++;p.tp++;if(p.level%3===0)p.sp++;this.computeDerived();p.hp=Math.min(p.d.maxhp,p.hp+CLASSES[p.cls].hp);this.log(`Level ${p.level}! Choose a talent (C).`,'#ffe27a');this.fx('levelup');if(p.level===4&&!p.spec)this.log('You can now choose a specialization.','#ffe27a');}},
  skillUse(s,amt){const p=G.p;p.skillXp[s]=(p.skillXp[s]||0)+(amt||1);const need=(p.skills[s]+1)*10;if(p.skillXp[s]>=need&&p.skills[s]<10){p.skillXp[s]-=need;p.skills[s]++;this.log(`${s[0].toUpperCase()+s.slice(1)} improved to ${p.skills[s]}.`,'#8f8');this.computeDerived();}},
  availableTalents(){const p=G.p;const out=[];for(const id in TALENTS){const t=TALENTS[id];if(p.talents.includes(id))continue;if(t.cls&&t.cls!==p.cls)continue;const isSpecT=Object.values(SPECS).some(s=>s.talents.includes(id));if(isSpecT){if(!p.spec||!SPECS[p.spec].talents.includes(id))continue;}out.push(id);}return out;},
@@ -1462,7 +1483,7 @@ const Game={
   if(G.day>=5&&!G.quests.keep_light)this.startQuest('keep_light');},
 
  // ---------- dialogue ----------
- talk(e){const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
+ talk(e){if(e.def==='mags')G.flags.met_mags=1;const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
  dlgChoose(e,opt){const u=this.ui();if(opt.act)opt.act(G);const nx=opt.next;if(!nx){/* action-only option (trade etc.) keeps panel unless UI replaced it */return;}if(nx==='end'){G.dlg=null;if(u)u.closeDialogue();this.act(20);return;}const node=DLG[e.def][nx](G);if(u)u.showDialogue(e,node);},
  // trade
  price(id,buying,npc){const d=ITEMS[id];const p=G.p;let v=d.val||1;const fac=NPCS[npc]?NPCS[npc].faction:null;const r=fac?(G.rep[fac]||0):0;
@@ -1671,7 +1692,7 @@ Object.assign(Game,{
  wander(e,home,r){const d=this.rc(DIRS8);const nx=e.x+d[0],ny=e.y+d[1];if(this.walkableFor(nx,ny)&&this.dist(nx,ny,home[0],home[1])<=r&&this.tile(nx,ny)!==T.EXIT&&!this.inSafeDifferent(e,nx,ny)&&TILE_DEFS[this.tile(nx,ny)].h===undefined){e.x=nx;e.y=ny;}},
  inSafeDifferent(e,x,y){const s=this.inSafe(x,y);return s&&e.kind==='e'&&HOSTILE_FACTIONS[e.fac];},
  stepToward(e,tx,ty){const z=G.zone;let best=null,bd=this.dist(e.x,e.y,tx,ty)+0.5,bs=this.edist(e.x,e.y,tx,ty);const dirs=RNG.shuffle(DIRS8.slice());
-  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!ENEMIES[e.def].tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
+  for(const [dx,dy] of dirs){const nx=e.x+dx,ny=e.y+dy;if(!this.walkable(nx,ny)&&!(this.tile(nx,ny)===T.DOOR&&!this.entityCombatDef(e).tags.includes('creature')))continue;if(this.entAt(nx,ny)||(nx===G.p.x&&ny===G.p.y))continue;const t=this.tile(nx,ny);if(t===T.DEEP||t===T.EXIT||TILE_DEFS[t].h)continue;const dd=this.dist(nx,ny,tx,ty),ed=this.edist(nx,ny,tx,ty);if(dd<bd||(dd===bd&&ed<bs)){bd=dd;bs=ed;best=[nx,ny];}}
   if(!best){// try BFS a few steps for corners
    const path=this.bfs(e.x,e.y,tx,ty,e);if(path&&path.length>1){best=path[1];}}
   if(!best)return false;const t=this.tile(best[0],best[1]);if(t===T.DOOR){Gen.set(z,best[0],best[1],T.DOOR_OPEN);return true;}e.x=best[0];e.y=best[1];return true;},
@@ -1726,14 +1747,43 @@ Object.assign(Game,{
   meta.endings=meta.endings||{};meta.endings[id]=(meta.endings[id]||0)+1;
   summary.unlocks=unl;this.saveMeta(meta);this.clearSave();const u=this.ui();if(u)u.showEnd(summary,ENDINGS[id]);},
 
+ // ---------- campaign milestones and refuge ----------
+ awardMilestone(id,xp,label){G.milestones=G.milestones||{};if(G.milestones[id])return false;G.milestones[id]=1;this.giveXp(xp);this.log(`${label}: +${xp} XP.`,'#8fd');return true;},
+ atRefuge(){return !!(G&&!G.dead&&!G.ending&&G.zoneId==='ashgrove'&&this.buildingAt(G.p.x,G.p.y)?.prefab==='bar'&&this.inSafe(G.p.x,G.p.y));},
+ refugeState(){return G.refuge||(G.refuge={stash:[],workbench:false});},
+ refugeTransfer(inst,take){if(!this.atRefuge())return false;const r=this.refugeState(),src=take?r.stash:G.p.inv;if(!src.includes(inst))return false;if(!take&&ITEMS[inst.id].noDrop)return false;
+  if(take){if(!this.addItemChecked({...inst,mods:inst.mods&&inst.mods.slice()}))return false;src.splice(src.indexOf(inst),1);}else{src.splice(src.indexOf(inst),1);r.stash.push(inst);this.log(`Stored ${this.itemName(inst)} at the Last Light.`,'#8fd');this.computeDerived();}this.save();return true;},
+ buildRefugeBench(){if(!this.atRefuge()||this.refugeState().workbench)return false;if(this.countItem('scrap')<8||this.countItem('electronics')<2){this.log('Need 8 scrap and 2 electronics in your pack.','#fd8');return false;}this.removeItem('scrap',8);this.removeItem('electronics',2);this.refugeState().workbench=true;this.awardMilestone('refuge:bench',50,'Last Light workbench completed');this.log('A working bench. One more reason to come home.','#8fd');this.save();return true;},
+ refugeMenu(x,y){if(!this.atRefuge())return;const u=this.ui();if(!u)return;const r=this.refugeState();const bed=G.zone.t.findIndex((t,i)=>t===T.BED&&this.buildingAt(i%G.zone.w,Math.floor(i/G.zone.w))?.prefab==='bar');
+  const opts=[{t:`Store supplies (${G.p.inv.length} carried stacks)`,f:()=>this.refugeInventory(false)},{t:`Retrieve supplies (${r.stash.length} stored stacks)`,f:()=>this.refugeInventory(true)}];
+  if(bed>=0)opts.push({t:'Rest - normal bed fees apply',f:()=>this.sleepPrompt(bed%G.zone.w,Math.floor(bed/G.zone.w),true)});
+  if(r.workbench)opts.push({t:'Use your workbench',f:()=>u.openCraft()});else opts.push({t:'Build workbench - 8 scrap + 2 electronics (50 XP)',f:()=>{this.buildRefugeBench();this.refugeMenu();}});
+  opts.push({t:'Head back out',f:()=>{}});u.choice('THE LAST LIGHT\nYour locker is free. Supplies and projects persist for this character. Withdraw materials before crafting.\nNext lead: Mags knows the neighborhood; Wren at Saints Hall needs a package recovered.',opts);},
+ refugeInventory(take){if(!this.atRefuge())return;const list=take?this.refugeState().stash:G.p.inv;this.ui().choice(take?'Your locker - take a whole stack':'Your pack - store a whole stack',list.filter(it=>take||!ITEMS[it.id].noDrop).map(it=>({t:this.itemName(it),f:()=>{this.refugeTransfer(it,take);this.refugeInventory(take);}})).concat([{t:'Back to refuge',f:()=>this.refugeMenu()}]));},
+
  // ---------- save / load ----------
  storage(){try{if(typeof localStorage!=='undefined')return localStorage;}catch(e){}return null;},
- serialize(){G.rngs=RNG.s;const z=G.zone;G.zone=null;const s=JSON.stringify(G,(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);G.zone=z;return s;},
- save(){if(!G||G.dead||G.ending)return;try{const st=this.storage();if(st)st.setItem('nr_save',this.serialize());}catch(e){}},
+ serialize(){return JSON.stringify({...G,saveVersion:2,rngs:RNG.s,zone:null},(k,v)=>k==='def'&&v&&typeof v==='object'?undefined:v);},
+ save(){if(!G||G.dead||G.ending)return false;try{const st=this.storage();if(!st)throw Error('Storage unavailable');const next=this.serialize(),old=st.getItem('nr_save');if(old){try{this.validateSave(JSON.parse(old));st.setItem('nr_save_backup',old);}catch(e){}}st.setItem('nr_save',next);return true;}catch(e){this.log('Could not save on this device. Export your save from Settings.','#f66');return false;}},
  exportSave(){return this.serialize();},
- load(str){try{const st=this.storage();const s=str||(st&&st.getItem('nr_save'));if(!s)return false;const g=JSON.parse(s);if(!g||!g.p)return false;G=g;RNG.seed(G.rngs||G.seed);RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];G.zone.def=ZONES[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();return true;}catch(e){console.error(e);return false;}},
- hasSave(){const st=this.storage();return !!(st&&st.getItem('nr_save'));},
- clearSave(){try{const st=this.storage();if(st)st.removeItem('nr_save');}catch(e){}},
+ validateSave(g){
+  if(!g||!g.p||!CLASSES[g.p.cls]||!g.zones||!ZONES[g.zoneId]||!g.zones[g.zoneId])throw Error('Incomplete save');
+  if((g.saveVersion||1)>2)throw Error('This save needs a newer game version');
+  for(const k of ['inv','statuses','talents','chrome','flesh','zonesSeen'])if(!Array.isArray(g.p[k]))throw Error('Invalid player data');
+  for(const k of ['hp','xp','level','x','y'])if(!Number.isFinite(g.p[k]))throw Error('Invalid player numbers');
+  for(const z of Object.values(g.zones)){if(!ZONES[z.id]||!Number.isInteger(z.w)||!Number.isInteger(z.h)||z.w<1||z.h<1||!Array.isArray(z.t)||z.t.length!==z.w*z.h||z.t.some(t=>!TILE_DEFS[t]))throw Error('Invalid district');for(const k of ['ents','items','objs','seen','buildings','exits'])if(!Array.isArray(z[k]))throw Error('Incomplete district');}
+  const z=g.zones[g.zoneId];if(g.p.x<0||g.p.y<0||g.p.x>=z.w||g.p.y>=z.h)throw Error('Invalid position');
+  g.saveVersion=2;g.refuge=g.refuge||{stash:[],workbench:false};g.milestones=g.milestones||{};
+  if(!Array.isArray(g.refuge.stash)||!g.p.eq||!g.flags||!g.quests||!g.rep)throw Error('Incomplete campaign data');
+  for(const it of [...g.p.inv,...Object.values(g.p.eq).filter(Boolean),...g.refuge.stash])if(!it||!ITEMS[it.id]||!Number.isFinite(it.qty)||it.qty<1)throw Error('Invalid saved item');
+  return g;
+ },
+ load(str){const previous=G,rs=RNG.s;this.loadError='';const st=this.storage();let candidates;
+  try{candidates=str!==undefined?[str]:[st&&st.getItem('nr_save'),st&&st.getItem('nr_save_backup')];}catch(e){this.loadError='Device storage is unavailable.';return false;}
+  for(let i=0;i<candidates.length;i++){if(!candidates[i])continue;try{const g=this.validateSave(JSON.parse(candidates[i]));G=g;RNG.s=G.rngs||G.seed;G.zone=G.zones[G.zoneId];for(const id in G.zones)G.zones[id].def=ZONES[id];if(!G.zone.lit)this.recomputeLight();this.computeDerived();this.computeFov();if(i>0)this.log('Recovered the previous autosave. Your most recent actions may be missing.','#fd8');return true;}catch(e){G=previous;RNG.s=rs;this.loadError=e.message;}}
+  return false;},
+ hasSave(){try{const st=this.storage();return !!(st&&(st.getItem('nr_save')||st.getItem('nr_save_backup')));}catch(e){return false;}},
+ clearSave(){try{const st=this.storage();if(st){st.removeItem('nr_save');st.removeItem('nr_save_backup');}}catch(e){}},
  loadMeta(){try{const st=this.storage();const s=st&&st.getItem('nr_meta');if(s)return Object.assign({runs:[],unlocks:{},codex:{},settings:{}},JSON.parse(s));}catch(e){}return{runs:[],unlocks:{},codex:{},settings:{}};},
  saveMeta(m){try{const st=this.storage();if(st)st.setItem('nr_meta',JSON.stringify(m));}catch(e){}}
 });
@@ -2145,7 +2195,8 @@ function showTitle(){
  el('h1',null,box,'NIGHT RUN');
  el('div','title-tag',box,'One person. One city. It already knows your name.');
  const btns=el('div','title-btns',box);
- if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast('Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
+ btn(btns,'Import save',()=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=async()=>{const file=input.files[0];if(!file)return;try{if(Game.load(await file.text())){Game.save();Sound.start();enterGame();}else toast(Game.loadError||'Invalid save.','#f66');}catch(e){toast('Could not read that save.','#f66');}};input.click();});
+ if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast(Game.loadError||'Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
  btn(btns,'New Run',()=>{Sound.start();if(Game.hasSave())confirmBox('Starting a new run abandons your current one. The city will not remember you.',()=>{Game.clearSave();showCreate();});else showCreate();},Game.hasSave()?'':'primary');
  btn(btns,'Codex',()=>{Sound.start();showCodex();});
  btn(btns,'Past Runs',()=>{Sound.start();showRuns();});
@@ -2344,6 +2395,10 @@ function paneAbil(pane){
  for(const [k,lab,fn] of [['R','Reload',()=>Game.reload()],['F','Fire at target',startFire],['T','Throw…',throwMenu],['Z','Rest (wait 10 turns)',rest],['X','Examine',()=>startLook()],['E','Interact / context',contextAction]]){const r=el('div','card-row',pane,`<b>[${k}]</b> ${lab}`);r.onclick=()=>{$('#side').classList.remove('open');fn();refresh();};}
 }
 function paneQuest(pane){
+ el('div','sec',pane,'Your refuge - Last Light');
+ el('div','small',pane,'Use a bed at the Last Light in Ashgrove to access your locker, rest, or build a workbench. Stored items stay here for this run.');
+ if(Game.atRefuge())el('button','btn',pane,'Open refuge').onclick=()=>Game.refugeMenu();
+
  const ids=Object.keys(G.quests);
  const act=ids.filter(i=>G.quests[i].state==='active'),done=ids.filter(i=>G.quests[i].state!=='active');
  if(!ids.length)el('div','muted',pane,'No leads yet. People talk. Listen.');
@@ -2550,7 +2605,7 @@ function epitaph(s){if(s.days<=1)return 'The city barely noticed.';if(s.attentio
 // PAUSE / SETTINGS / HELP / CODEX / RUNS
 // ============================================================
 function pauseMenu(){modal(box=>{el('h3',null,box,'Paused');el('div','muted small',box,`${esc(G.p.name)} · Day ${G.day} ${Game.timeStr()} · ${esc(G.zone.name)}`);const o=el('div','opts',box);
- const items=[['Resume',()=>{}],['Save',()=>{Game.save();toast('Saved.','#8f8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{Game.save();showTitle();}]];
+ const items=[['Resume',()=>{}],['Save',()=>{toast(Game.save()?'Saved.':'Save failed. Export a backup from Settings.','#fd8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{if(Game.save())showTitle();else toast('Save failed. Export a backup from Settings before quitting.','#f66');}]];
  for(const [l,f] of items){const b=el('button','opt',o,l);b.onclick=()=>{closeModal();f();};}});}
 function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const sl=(lab,key)=>{const r=el('div','set-row',box);el('span',null,r,lab);const i=el('input',null,r);i.type='range';i.min=0;i.max=1;i.step=0.05;i.value=settings[key];i.oninput=()=>{settings[key]=+i.value;saveSettings();};};
@@ -2560,6 +2615,7 @@ function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const sel=(lab,key,opts)=>{const r=el('div','set-row',box);el('span',null,r,lab);const s=el('select',null,r);for(const [v,t] of opts){const o=el('option',null,s,t);o.value=v;if(String(settings[key])===String(v))o.selected=true;}s.onchange=()=>{settings[key]=isNaN(+s.value)?s.value:+s.value;saveSettings();};};
  sel('Map zoom','zoom',ZOOM_LEVELS.map(v=>[v,Math.round(v*100)+'%']));sel('Touch controls','touch',[['auto','Auto'],['on','Always'],['off','Never']]);
  el('div','small muted',box,'Music is optional and off by default. Ambience uses quiet environmental textures.');
+ if(G&&!G.dead&&!G.ending){const download=el('button','opt',box,'Export save backup');download.onclick=()=>{const url=URL.createObjectURL(new Blob([Game.exportSave()],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='nightrun-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
  const r=el('div','opts',box);const b=el('button','opt',r,'Reset hints');b.onclick=()=>{meta=Game.loadMeta();meta.hints={};Game.saveMeta(meta);toast('Hints will show again.','#8f8');};
  if(G&&!screens.game.classList.contains('hidden')){}else{const bk=el('button','opt',r,'Back');bk.onclick=()=>{closeModal();};}});}
 function showHelp(){modal(box=>{el('h3',null,box,'How to survive');box.insertAdjacentHTML('beforeend',`

@@ -34,7 +34,7 @@ const Game={
   this.enterZone('ashgrove',null);
   this.log(`${p.name} the ${cd.name} enters the fractured city. It is ${this.timeStr()}. Night falls at 20:00.`,'#fd8');
   this.log(cd.tag,'#aaa');this.log('Move with arrows/WASD/numpad, bump to attack or interact. Press ? for help.','#8f8');
-  this.save();return G;},
+  this.startQuest('first_steps');this.log('Your locker and refuge projects are available at the Last Light beds.','#8fd');this.save();return G;},
  makeItem(id,qty){const d=ITEMS[id];const it={id,qty:d.stack?(qty||1):1};if(d.dur)it.dur=d.dur;if(d.clip!==undefined)it.clip=0;if(d.charges)it.charges=d.charges;if(d.type==='weapon')it.mods=[];return it;},
 
  // ---------- derived stats ----------
@@ -68,7 +68,7 @@ const Game={
    const bar=z.buildings.find(b=>b.prefab==='bar');if(bar){const c=Gen.roomFloor(z,bar.rooms[0],false).filter(([x,y])=>!this.entAt(x,y));if(c.length)spot=c[0];}
    if(!spot&&z.exits.length){const ex=z.exits[0];const dir=ex.edge==='N'?[0,1]:ex.edge==='S'?[0,-1]:ex.edge==='W'?[1,0]:[-1,0];spot=this.freeNear(ex.x+dir[0],ex.y+dir[1],4)||[ex.x+dir[0],ex.y+dir[1]];}}
   p.x=spot[0];p.y=spot[1];
-  if(!z.visited){z.visited=1;p.zonesSeen.push(id);this.log(`— ${z.name} —`,'#fd8');this.log(z.def.tag,'#aaa');const dn=['','feels quiet. Mostly.','has teeth.','is dangerous. Move carefully.','is very dangerous. Every corner could be your last.','should not exist. Nothing here is safe.'][z.def.danger]||'';this.log(`This district ${dn}`,z.def.danger>=4?'#f66':'#ccc');this.fx('zone',z.name);this.pushAction('entered '+z.name);}
+  if(!z.visited){z.visited=1;p.zonesSeen.push(id);this.log(`— ${z.name} —`,'#fd8');this.log(z.def.tag,'#aaa');const dn=['','feels quiet. Mostly.','has teeth.','is dangerous. Move carefully.','is very dangerous. Every corner could be your last.','should not exist. Nothing here is safe.'][z.def.danger]||'';this.log(`This district ${dn}`,z.def.danger>=4?'#f66':'#ccc');this.fx('zone',z.name);this.pushAction('entered '+z.name);if(id!=='ashgrove')this.awardMilestone('district:'+id,35,'New district explored');}
   else{this.log(`You return to ${z.name}.`,'#fd8');const gap=G.turn-z.lastVisit;if(gap>480&&z.def.danger>=1){this.respawnRoamers(z,Math.min(3,Math.floor(gap/480)));}}
   this.recomputeLight();this.computeFov();this.checkZoneEntryFlags(id);this.save();},
  checkZoneEntryFlags(id){if(id==='static'&&!G.flags.static_seen){G.flags.static_seen=1;this.attention(5);this.echoMessage('arrive');}},
@@ -218,7 +218,7 @@ const Game={
    ...(p.eq.weapon&&['fireaxe','sledge'].includes(p.eq.weapon.id)?[{t:'Break it down',f:()=>{open();this.noise(x,y,10);this.act(200);}}]:[]),{t:'Leave it',f:()=>{}}]);},
  roll(pct){return this.ri(1,100)<=pct;},
  takeAll(c){for(const it of c.items.slice()){if(this.addItemChecked(it)){c.items.splice(c.items.indexOf(it),1);}}},
- sleepPrompt(x,y){const u=this.ui();const safe=this.inSafe(x,y);const b=this.buildingAt(x,y);const barBed=b&&b.prefab==='bar';if(barBed&&G.flags.bar_bed!==G.day&&(G.rep.saints||0)<20){this.log('Mags\' beds. Ten creds, or Saints\' goodwill. Ask her.','#fd8');return;}
+ sleepPrompt(x,y,restOnly){if(!restOnly&&this.atRefuge()){this.refugeMenu(x,y);return;}const u=this.ui();const safe=this.inSafe(x,y);const b=this.buildingAt(x,y);const barBed=b&&b.prefab==='bar';if(barBed&&G.flags.bar_bed!==G.day&&(G.rep.saints||0)<20){this.log('Mags\' beds. Ten creds, or Saints\' goodwill. Ask her.','#fd8');return;}
   const hrs=[2,4,8];if(u)u.choice(safe?'A bed. Safe enough.':'A bed. Nowhere is safe. Something could find you.',hrs.map(h=>({t:`Sleep ${h} hours`,f:()=>this.sleep(h,!!safe)})).concat([{t:'Not now',f:()=>{}}]));},
  sleep(h,safe){const p=G.p;const turns=h*60;this.fx('fade');
   let woke=false;for(let i=0;i<h;i++){G.time+=60;G.turn+=60;p.fatigue=Math.max(0,p.fatigue-11);p.hunger=Math.min(120,p.hunger+3.5);p.hp=Math.min(p.d.maxhp,p.hp+Math.ceil(p.d.maxhp*0.05));p.stam=p.d.maxstam;
@@ -292,7 +292,7 @@ const Game={
  fullHeal(){const p=G.p;p.hp=p.d.maxhp;for(const s of p.statuses.slice())if(['bleed','fracture','burn','poison','infection','concussion','malfunction'].includes(s.id))this.removeStatus(s.id);},
 
  // ---------- progression ----------
- xpNeeded(l){return 60*l*l;},
+ xpNeeded(l){return l===1?60:l===2?120:l===3?180:60*l*l;},
  giveXp(n){const p=G.p;n=Math.round(n*(1+p.d.xp/100));p.xp+=n;while(p.xp>=this.xpNeeded(p.level)){p.xp-=this.xpNeeded(p.level);p.level++;p.tp++;if(p.level%3===0)p.sp++;this.computeDerived();p.hp=Math.min(p.d.maxhp,p.hp+CLASSES[p.cls].hp);this.log(`Level ${p.level}! Choose a talent (C).`,'#ffe27a');this.fx('levelup');if(p.level===4&&!p.spec)this.log('You can now choose a specialization.','#ffe27a');}},
  skillUse(s,amt){const p=G.p;p.skillXp[s]=(p.skillXp[s]||0)+(amt||1);const need=(p.skills[s]+1)*10;if(p.skillXp[s]>=need&&p.skills[s]<10){p.skillXp[s]-=need;p.skills[s]++;this.log(`${s[0].toUpperCase()+s.slice(1)} improved to ${p.skills[s]}.`,'#8f8');this.computeDerived();}},
  availableTalents(){const p=G.p;const out=[];for(const id in TALENTS){const t=TALENTS[id];if(p.talents.includes(id))continue;if(t.cls&&t.cls!==p.cls)continue;const isSpecT=Object.values(SPECS).some(s=>s.talents.includes(id));if(isSpecT){if(!p.spec||!SPECS[p.spec].talents.includes(id))continue;}out.push(id);}return out;},
@@ -316,7 +316,7 @@ const Game={
   if(G.day>=5&&!G.quests.keep_light)this.startQuest('keep_light');},
 
  // ---------- dialogue ----------
- talk(e){const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
+ talk(e){if(e.def==='mags')G.flags.met_mags=1;const u=this.ui();const n=NPCS[e.def];if(!n){this.log(e.name+' says nothing.','#888');return;}if(!DLG[e.def]){this.log(`${e.name}: "..."`,'#ccc');return;}const node=DLG[e.def].start(G);G.dlg={npc:e.def,node:'start'};if(u)u.showDialogue(e,node);else{}},
  dlgChoose(e,opt){const u=this.ui();if(opt.act)opt.act(G);const nx=opt.next;if(!nx){/* action-only option (trade etc.) keeps panel unless UI replaced it */return;}if(nx==='end'){G.dlg=null;if(u)u.closeDialogue();this.act(20);return;}const node=DLG[e.def][nx](G);if(u)u.showDialogue(e,node);},
  // trade
  price(id,buying,npc){const d=ITEMS[id];const p=G.p;let v=d.val||1;const fac=NPCS[npc]?NPCS[npc].faction:null;const r=fac?(G.rep[fac]||0):0;

@@ -76,7 +76,8 @@ function showTitle(){
  el('h1',null,box,'NIGHT RUN');
  el('div','title-tag',box,'One person. One city. It already knows your name.');
  const btns=el('div','title-btns',box);
- if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast('Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
+ btn(btns,'Import save',()=>{const input=document.createElement('input');input.type='file';input.accept='.json,application/json';input.onchange=async()=>{const file=input.files[0];if(!file)return;try{if(Game.load(await file.text())){Game.save();Sound.start();enterGame();}else toast(Game.loadError||'Invalid save.','#f66');}catch(e){toast('Could not read that save.','#f66');}};input.click();});
+ if(Game.hasSave()){const b=btn(btns,'Continue',()=>{Sound.start();if(Game.load()){enterGame();}else toast(Game.loadError||'Save could not be read.','#f66');},'primary');b.title='Resume your active run';}
  btn(btns,'New Run',()=>{Sound.start();if(Game.hasSave())confirmBox('Starting a new run abandons your current one. The city will not remember you.',()=>{Game.clearSave();showCreate();});else showCreate();},Game.hasSave()?'':'primary');
  btn(btns,'Codex',()=>{Sound.start();showCodex();});
  btn(btns,'Past Runs',()=>{Sound.start();showRuns();});
@@ -275,6 +276,10 @@ function paneAbil(pane){
  for(const [k,lab,fn] of [['R','Reload',()=>Game.reload()],['F','Fire at target',startFire],['T','Throw…',throwMenu],['Z','Rest (wait 10 turns)',rest],['X','Examine',()=>startLook()],['E','Interact / context',contextAction]]){const r=el('div','card-row',pane,`<b>[${k}]</b> ${lab}`);r.onclick=()=>{$('#side').classList.remove('open');fn();refresh();};}
 }
 function paneQuest(pane){
+ el('div','sec',pane,'Your refuge - Last Light');
+ el('div','small',pane,'Use a bed at the Last Light in Ashgrove to access your locker, rest, or build a workbench. Stored items stay here for this run.');
+ if(Game.atRefuge())el('button','btn',pane,'Open refuge').onclick=()=>Game.refugeMenu();
+
  const ids=Object.keys(G.quests);
  const act=ids.filter(i=>G.quests[i].state==='active'),done=ids.filter(i=>G.quests[i].state!=='active');
  if(!ids.length)el('div','muted',pane,'No leads yet. People talk. Listen.');
@@ -481,7 +486,7 @@ function epitaph(s){if(s.days<=1)return 'The city barely noticed.';if(s.attentio
 // PAUSE / SETTINGS / HELP / CODEX / RUNS
 // ============================================================
 function pauseMenu(){modal(box=>{el('h3',null,box,'Paused');el('div','muted small',box,`${esc(G.p.name)} · Day ${G.day} ${Game.timeStr()} · ${esc(G.zone.name)}`);const o=el('div','opts',box);
- const items=[['Resume',()=>{}],['Save',()=>{Game.save();toast('Saved.','#8f8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{Game.save();showTitle();}]];
+ const items=[['Resume',()=>{}],['Save',()=>{toast(Game.save()?'Saved.':'Save failed. Export a backup from Settings.','#fd8');}],['Settings',showSettings],['Help & controls',showHelp],['Codex',showCodex],['Save & quit to title',()=>{if(Game.save())showTitle();else toast('Save failed. Export a backup from Settings before quitting.','#f66');}]];
  for(const [l,f] of items){const b=el('button','opt',o,l);b.onclick=()=>{closeModal();f();};}});}
 function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const sl=(lab,key)=>{const r=el('div','set-row',box);el('span',null,r,lab);const i=el('input',null,r);i.type='range';i.min=0;i.max=1;i.step=0.05;i.value=settings[key];i.oninput=()=>{settings[key]=+i.value;saveSettings();};};
@@ -491,6 +496,7 @@ function showSettings(){modal(box=>{el('h3',null,box,'Settings');
  const sel=(lab,key,opts)=>{const r=el('div','set-row',box);el('span',null,r,lab);const s=el('select',null,r);for(const [v,t] of opts){const o=el('option',null,s,t);o.value=v;if(String(settings[key])===String(v))o.selected=true;}s.onchange=()=>{settings[key]=isNaN(+s.value)?s.value:+s.value;saveSettings();};};
  sel('Map zoom','zoom',ZOOM_LEVELS.map(v=>[v,Math.round(v*100)+'%']));sel('Touch controls','touch',[['auto','Auto'],['on','Always'],['off','Never']]);
  el('div','small muted',box,'Music is optional and off by default. Ambience uses quiet environmental textures.');
+ if(G&&!G.dead&&!G.ending){const download=el('button','opt',box,'Export save backup');download.onclick=()=>{const url=URL.createObjectURL(new Blob([Game.exportSave()],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='nightrun-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};}
  const r=el('div','opts',box);const b=el('button','opt',r,'Reset hints');b.onclick=()=>{meta=Game.loadMeta();meta.hints={};Game.saveMeta(meta);toast('Hints will show again.','#8f8');};
  if(G&&!screens.game.classList.contains('hidden')){}else{const bk=el('button','opt',r,'Back');bk.onclick=()=>{closeModal();};}});}
 function showHelp(){modal(box=>{el('h3',null,box,'How to survive');box.insertAdjacentHTML('beforeend',`

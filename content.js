@@ -7,6 +7,7 @@
 // ---------- QUESTS ----------
 // stages: [{text, done(g)}]  reward applied on final completion. hidden quests start via flags.
 const QUESTS={
+ first_steps:{name:'A Foothold',fac:'saints',desc:'Start at the Last Light. Mags has local leads; Wren at Saints Hall offers work. Your locker is available through the beds.',stages:[{text:'Talk to Mags at the Last Light.',done:g=>g.flags.met_mags},{text:'Recover Wren\'s package from Delmar Apartments and return it to Wren at Saints Hall.',done:g=>g.flags.wren_package_done}],reward:{xp:40}},
  wren_package:{name:"Wren's Package",fac:'saints',desc:'Wren wants a package back from the Delmar Apartments stash. Scavs moved in after the Saints moved out.',
   stages:[{text:'Recover the package from the Delmar Apartments (Ashgrove).',done:g=>Game.hasItem('wren_package')},{text:'Bring it to Wren at Saints Hall.',done:g=>G.flags.wren_package_done}],
   reward:{xp:80,creds:60,rep:{saints:20}}},
