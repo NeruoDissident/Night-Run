@@ -13,6 +13,10 @@ A procedural cyberpunk survival roguelike that runs in the browser. One person, 
 - The Echo, 4 escape routes and 9 endings, permadeath, save/continue, meta unlocks
 - Pixel-art sprites, synthesized audio, keyboard / mouse / touch controls
 
+## Map and audio controls
+- Zoom with the on-map **− / +** buttons, the mouse wheel over the map, or **− / +** keys. **0** or the percentage button resets to 100%. Zoom (50–200%) is saved between sessions.
+- Settings has separate effects, ambience, and music volume controls. Music is optional and off by default; ambience uses quieter environmental textures without random pitched chimes. Audio stops on the title/end screens and while the tab is hidden.
+
 ## Layout
 | File | Role |
 |---|---|
@@ -32,4 +36,6 @@ A procedural cyberpunk survival roguelike that runs in the browser. One person, 
 python3 assets/gen_sprites.py   # only if you changed the art
 node build.js                   # writes index.html
 node test.js                    # engine smoke test
+node regression-test.js         # seeded NPC generation and combat/save regressions
+node audio-test.js              # audio scheduling, mute, and lifecycle regressions
 ```

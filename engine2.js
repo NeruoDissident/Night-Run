@@ -7,20 +7,23 @@ Object.assign(Game,{
  // ---------- combat core ----------
  // attacker/defender: 'P' for player or an entity
  combatStats(a){if(a==='P'){const p=G.p,d=p.d,w=this.weaponDef();return{name:p.name,hitBonus:(w.ranged?d.hitR+this.skill('firearms')*4+d.stats.per*2:d.hitM+this.skill('melee')*4+d.stats.agi*2),evade:d.evade,arm:d.arm,crit:d.crit,isP:1,w};}
-  const d=ENEMIES[a.def];return{name:a.name,hitBonus:d.hit+10,evade:d.evade+(a.st.jammed?-3:0),arm:d.arm,crit:3,isP:0,w:{dmg:d.dmg,ranged:d.ranged,props:d.props||[]}};},
+  const d=this.entityCombatDef(a);return{name:a.name,hitBonus:d.hit+10,evade:d.evade+(a.st.jammed?-3:0),arm:d.arm,crit:3,isP:0,w:{dmg:d.dmg,ranged:d.ranged,props:d.props||[]}};},
+ entityCombatDef(e){return e.kind==='npc'?{hit:0,evade:2,arm:0,dmg:[3,8],tags:['human'],ai:[],props:[]}:ENEMIES[e.def];},
  posOf(a){return a==='P'?[G.p.x,G.p.y]:[a.x,a.y];},
  attack(att,def,opts){opts=opts||{};const A=this.combatStats(att),D=this.combatStats(def);const [ax,ay]=this.posOf(att),[dx,dy]=this.posOf(def);const dist=this.dist(ax,ay,dx,dy);const w=opts.w||A.w;const ranged=!!w.ranged&&!opts.melee;
   let chance=55+A.hitBonus-D.evade*3;
   if(ranged){chance-=Math.max(0,dist-3)*3;if(w.closeBonus&&dist<=2)chance+=15;if(w.scoped&&dist>=5)chance+=10;if(this.coverBetween(ax,ay,dx,dy))chance-=20;}
-  const night=this.isNight();const litT=G.zone.lit&&G.zone.lit[dy*G.zone.w+dx];if(night&&!litT){chance-=A.isP?(G.p.d.visionNight>6?0:10):(ENEMIES[att.def].tags.includes('creature')||ENEMIES[att.def].ai.includes('night')?0:10);}
+  const enemyDef=A.isP?null:this.entityCombatDef(att);
+  const aimed=A.isP&&ranged&&this.hasStatus('aim');
+  const night=this.isNight();const litT=G.zone.lit&&G.zone.lit[dy*G.zone.w+dx];if(night&&!litT){chance-=A.isP?(G.p.d.visionNight>6?0:10):(enemyDef.tags.includes('creature')||enemyDef.ai.includes('night')?0:10);}
   if(G.rain)chance-=5;
-  if(A.isP){if(this.hasStatus('aim')){chance+=30;this.removeStatus('aim');}if(w.mods&&w.mods.includes('scope'))chance+=10;if(this.hasStatus('hidden')||opts.ambush)chance+=25;}
+  if(A.isP){if(aimed){chance+=30;this.removeStatus('aim');}if(ranged&&G.p.eq.weapon?.mods?.includes('scope'))chance+=10;if(this.hasStatus('hidden')||opts.ambush)chance+=25;}
   else{if(att.st.jammed)chance-=30;if(att.st.fear)chance-=15;if(this.hasStatus('hidden')&&!opts.ambush)chance-=25;// surround bonus for flankers
-   if(ENEMIES[att.def].ai.includes('flank')&&def==='P'){let allies=0;for(const e of G.zone.ents)if(e!==att&&e.kind==='e'&&this.isHostile(e)&&this.dist(e.x,e.y,dx,dy)<=1)allies++;if(allies)chance+=12;}}
+   if(enemyDef.ai.includes('flank')&&def==='P'){let allies=0;for(const e of G.zone.ents)if(e!==att&&e.kind==='e'&&this.isHostile(e)&&this.dist(e.x,e.y,dx,dy)<=1)allies++;if(allies)chance+=12;}}
   chance=this.clamp(chance,5,97);
   const r=this.ri(1,100);const hit=r<=chance;
   if(!hit){this.log(`${A.name} ${ranged?'fires at':'swings at'} ${D.name} and misses.`,A.isP?'#aaa':'#ccc');this.fx(ranged?'shot':'miss',{x:dx,y:dy,fx:ax,fy:ay,miss:1});if(!ranged)this.fx('whiff',{x:dx,y:dy});return {hit:false};}
-  let crit=r<=A.crit+(A.isP&&this.hasStatus('aim')?20:0)||(A.isP&&opts.ambush&&this.fxf('ambushCrit'));
+  let crit=r<=A.crit+(aimed?20:0)||(A.isP&&opts.ambush&&this.fxf('ambushCrit'));
   let dmg=this.ri(w.dmg[0],w.dmg[1]);
   if(A.isP){const d=G.p.d;dmg+=ranged?Math.floor(d.stats.per/3):Math.floor(d.stats.str/2)+d.dmgM;if(ranged&&w.ammo==='rifle'&&d.flags.rifleDmg)dmg+=d.flags.rifleDmg;if(opts.ambush||this.hasStatus('hidden'))dmg=Math.round(dmg*(d.ambush>1?d.ambush:1.5));if(opts.burst)dmg=Math.round(dmg*(1+0.3*(opts.burst-1)));}
   else if(att.def==='echo_shade'){const pw=this.weaponDef();dmg=Math.max(dmg,this.ri(pw.dmg[0],pw.dmg[1])+2);}
@@ -33,7 +36,7 @@ Object.assign(Game,{
    if(props.includes('stun')&&this.chance(0.2)&&!G.p.d.immune.includes('stun')){this.addStatus('stun',1);this.log('You are stunned!','#ff0');}
    if(props.includes('poison')&&this.chance(0.35)&&!G.p.d.immune.includes('poison')){this.addStatus('poison',20);this.log('Poison burns in the wound.','#8f4');}
    if(crit){const inj=this.rc(['fracture','concussion','bleed','infection']);if(!G.p.d.immune.includes(inj)){this.addStatus(inj,inj==='bleed'?8:inj==='infection'?300:120);this.log(`${STATUSES[inj].n}!`,'#f44');}}
-   if(att.def&&ENEMIES[att.def].tags.includes('chromed')&&this.chance(0.1)&&G.p.chrome.length)this.addStatus('malfunction',10),this.log('The hit rattles your chrome.','#f6f');
+   if(enemyDef.tags.includes('chromed')&&this.chance(0.1)&&G.p.chrome.length)this.addStatus('malfunction',10),this.log('The hit rattles your chrome.','#f6f');
    // armor durability
    const body=G.p.eq.body;if(body&&body.dur!==undefined&&this.chance(0.3)){body.dur--;if(body.dur===0){this.log(`Your ${ITEMS[body.id].name} is falling apart.`,'#f66');this.computeDerived();}}
    this.dmgPlayer(final,A.name);}
@@ -48,7 +51,7 @@ Object.assign(Game,{
  damage(e,n,src,by){if(e.shield&&e.shield>0){const s=Math.min(e.shield,n);e.shield-=s;n-=s;e.shieldCd=3;if(n<=0){this.log(`${e.name}'s shield flares.`,'#aef');return;}}
   e.hp-=n;if(e.kind==='npc'&&!e.hostile){e.hostile=1;this.log(`${e.name} is now hostile!`,'#f66');if(e.fac)this.addRep(e.fac,-25);}
   if(e.kind==='e'&&!this.isHostile(e)&&by==='P'&&e.fac!=='ally'){e.hostile=1;this.addRep(e.fac,-8);for(const o of G.zone.ents)if(o.kind==='e'&&o.fac===e.fac&&this.dist(o.x,o.y,e.x,e.y)<=10){o.hostile=1;o.alert=20;o.lastSeen=[G.p.x,G.p.y];}}
-  if(by==='P'||src==='you'){e.alert=25;e.lastSeen=[G.p.x,G.p.y];e.hidden=0;}
+  if(by==='P'||src==='you'){e.hostile=1;e.alert=25;e.lastSeen=[G.p.x,G.p.y];e.hidden=0;}
   if(e.hp<=0)this.kill(e,by);},
  kill(e,by){const z=G.zone;const i=z.ents.indexOf(e);if(i>=0)z.ents.splice(i,1);const d=e.kind==='e'?ENEMIES[e.def]:null;
   if(e.kind==='npc'){G.flags['dead_'+e.def]=1;this.log(`${e.name} is dead.`,'#f66');if(e.fac)this.addRep(e.fac,-30);for(const qid in G.quests){const q=QUESTS[qid];if(q.fac===e.fac&&G.quests[qid].state==='active'&&['wren','tallow','okafor','dace','ives','kesh','cantor','ludo','sable','verity','mags'].includes(e.def)){}}if(e.def==='kesh')this.failQuest('boat');if(e.def==='dace')this.failQuest('power');if(e.def==='wren'){this.failQuest('wren_package');this.failQuest('bad_blood');this.failQuest('the_crown');}if(e.def==='ives')this.failQuest('skyhook');if(e.def==='cantor')this.failQuest('chorus');if(e.def==='sable'){G.flags.purge_done=1;}return;}
@@ -151,7 +154,7 @@ Object.assign(Game,{
   if(!canSee&&this.dist(e.x,e.y,tgt[0],tgt[1])<=1){e.lastSeen=null;if(e.alert>5)e.alert=5;}
   // overwatch
   if(moved&&this.hasStatus('aim')&&this.fxf('overwatch')){const c=this.canFire();if(c.ok&&this.dist(p.x,p.y,e.x,e.y)<=c.w.range&&this.los(p.x,p.y,e.x,e.y)&&this.visible(e.x,e.y)){this.log('Overwatch!','#8f8');p.eq.weapon.clip--;this.attack('P',e,{});}}},
- npcAct(e){if(e.hostile){const p=G.p;const dist=this.dist(e.x,e.y,p.x,p.y);if(dist<=1)this.attack(e,'P',{melee:1,w:{dmg:[3,8],props:[]}});else if(dist<=8)this.stepToward(e,p.x,p.y);return;}if(this.chance(0.1))this.wander(e,[e.x,e.y],1);},
+ npcAct(e){if(e.st.stun||e.st.jammed)return;if(e.hostile){const p=G.p;const dist=this.dist(e.x,e.y,p.x,p.y);if(dist<=1)this.attack(e,'P',{melee:1,w:{dmg:[3,8],props:[]}});else if(dist<=8)this.stepToward(e,p.x,p.y);return;}if(this.chance(0.1))this.wander(e,[e.x,e.y],1);},
  wander(e,home,r){const d=this.rc(DIRS8);const nx=e.x+d[0],ny=e.y+d[1];if(this.walkableFor(nx,ny)&&this.dist(nx,ny,home[0],home[1])<=r&&this.tile(nx,ny)!==T.EXIT&&!this.inSafeDifferent(e,nx,ny)&&TILE_DEFS[this.tile(nx,ny)].h===undefined){e.x=nx;e.y=ny;}},
  inSafeDifferent(e,x,y){const s=this.inSafe(x,y);return s&&e.kind==='e'&&HOSTILE_FACTIONS[e.fac];},
  stepToward(e,tx,ty){const z=G.zone;let best=null,bd=this.dist(e.x,e.y,tx,ty)+0.5,bs=this.edist(e.x,e.y,tx,ty);const dirs=RNG.shuffle(DIRS8.slice());

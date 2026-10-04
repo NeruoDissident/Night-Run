@@ -261,7 +261,13 @@ const Gen={
  // ---------- populations ----------
  populate(z,d){
   // NPCs into prefabs
-  for(const nid in NPCS){const n=NPCS[nid];if(n.zone!==z.id)continue;const b=z.buildings.find(b=>b.prefab===n.prefab);if(!b)continue;const r=b.rooms.reduce((a,c)=>a.w*a.h>=c.w*c.h?a:c);const c=this.roomFloor(z,r,false).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));if(!c.length)continue;const [x,y]=RNG.rc(c);z.ents.push(Game.makeNpc(nid,x,y,z));}
+  for(const nid in NPCS){const n=NPCS[nid];if(n.zone!==z.id)continue;const b=z.buildings.find(b=>b.prefab===n.prefab);if(!b)continue;
+   // Small chapels can have every floor tile furnished or changed to moss.
+   // Search every room, then allow safe walkable surfaces and door-adjacent floor.
+   let c=b.rooms.flatMap(r=>this.roomFloor(z,r,false)).filter(([x,y])=>!z.ents.some(e=>e.x===x&&e.y===y));
+   if(!c.length)for(let y=b.y+1;y<b.y+b.h-1;y++)for(let x=b.x+1;x<b.x+b.w-1;x++){const t=this.get(z,x,y);if(TILE_DEFS[t].w&&!TILE_DEFS[t].h&&t!==T.DEEP&&!TILE_DEFS[t].i&&!z.ents.some(e=>e.x===x&&e.y===y))c.push([x,y]);}
+   if(!c.length)throw new Error('No safe spawn for '+nid+' in '+z.id);
+   const [x,y]=RNG.rc(c);z.ents.push(Game.makeNpc(nid,x,y,z));}
   // guards & bosses
   for(const b of z.buildings){const pf=b.prefab&&PREFABS[b.prefab];if(!pf)continue;
    if(pf.guards){const grp=GROUPS[pf.guards[0]];for(let k=0;k<pf.guards[1];k++)for(const eid of grp){const c=this.bldFloor(z,b);if(!c.length)break;const [x,y]=RNG.rc(c);const e=Game.makeEnemy(eid,x,y,z,{home:[x,y],guard:1});if(b.safe&&!(pf.guards[0]==='ghouls'||pf.guards[0]==='scav'))e.fac=b.safe===1?null:b.safe;z.ents.push(e);}}

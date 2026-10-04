@@ -105,7 +105,7 @@ const Game={
  makeEnemy(defId,x,y,z,o){const d=ENEMIES[defId];o=o||{};const e={id:z.nextId++,kind:'e',def:defId,name:d.name,x,y,hp:d.hp,maxhp:d.hp,fac:o.fac||d.faction,hostile:o.hostile||0,alert:o.alert?20:0,lastSeen:null,home:o.home||[x,y],guard:o.guard||0,patrol:o.patrol||0,ammo:d.ammo||0,energy:this.ri(0,90),st:{},boss:o.boss||0,roam:o.roam||0,fighting:o.fighting||0,hidden:d.ai.includes('ambush')?1:0,shield:d.ai.includes('shield')?30:undefined,shieldCd:0,cd:0,speed:d.speed};if(defId==='hal_drone'||defId==='hal_sentry')e.hostileZone=1;return e;},
  makeNpc(nid,x,y,z){const n=NPCS[nid];return{id:z.nextId++,kind:'npc',def:nid,name:n.name,x,y,hp:40,maxhp:40,fac:n.faction,hostile:0,energy:0,st:{},speed:100};},
  spawnEnemy(defId,x,y,o){const z=G.zone;const p=Gen.nearOpen(z,x,y,2);if(!p)return null;const e=this.makeEnemy(defId,p[0],p[1],z,o||{});z.ents.push(e);return e;},
- isHostile(e){if(e.kind==='npc')return e.hostile;if(e.fac==='ally')return false;if(e.hostile)return true;if(HOSTILE_FACTIONS[e.fac])return true;const r=G.rep[e.fac]||0;if(r<-20)return true;const p=G.p;if(e.fac==='hands'&&(p.chrome.length>0||p.drift>20))return true;if(e.fac==='halcyon'&&(p.drift>50||(e.hostileZone&&r<10&&!G.flags.met_ives)))return true;if(e.fac==='choir'&&p.cls!=='listener'&&r<0)return false;return false;},
+ isHostile(e){if(e.kind==='npc')return e.hostile;if(e.fac==='ally')return false;if(e.hostile)return true;if(e.fac==='echo'&&G.p.cls==='listener')return false;if(HOSTILE_FACTIONS[e.fac])return true;const r=G.rep[e.fac]||0;if(r<-20)return true;const p=G.p;if(e.fac==='hands'&&(p.chrome.length>0||p.drift>20))return true;if(e.fac==='halcyon'&&(p.drift>50||(e.hostileZone&&r<10&&!G.flags.met_ives)))return true;if(e.fac==='choir'&&p.cls!=='listener'&&r<0)return false;return false;},
  isAlly(e){return e.fac==='ally';},
  enemiesVisible(){return G.zone.ents.filter(e=>e.kind==='e'&&!e.hidden&&this.visible(e.x,e.y)&&this.isHostile(e));},
 
@@ -142,7 +142,7 @@ const Game={
  hasStatus(id){return G.p.statuses.some(s=>s.id===id);},
  addStatus(id,t){const p=G.p;if(p.d&&p.d.immune.includes(id))return;const ex=p.statuses.find(s=>s.id===id);if(ex)ex.t=Math.max(ex.t,t);else{p.statuses.push({id,t});const sd=STATUSES[id];if(sd&&sd.mod)this.computeDerived();}},
  removeStatus(id){const p=G.p;const i=p.statuses.findIndex(s=>s.id===id);if(i>=0){p.statuses.splice(i,1);this.computeDerived();}},
- advanceWorld(cost){const z=G.zone;for(const e of z.ents.slice()){if(e.hp<=0)continue;e.energy+=e.speed*cost/100;let guard=0;while(e.energy>=100&&guard++<4&&e.hp>0){e.energy-=100;this.entTick(e);if(e.kind==='e')this.enemyAct(e);else this.npcAct(e);}}
+ advanceWorld(cost){const z=G.zone;for(const e of z.ents.slice()){if(e.hp<=0)continue;e.energy+=e.speed*cost/100;let guard=0;while(e.energy>=100&&guard++<4&&e.hp>0){e.energy-=100;this.entTick(e);if(e.kind==='e')this.enemyAct(e);else this.npcAct(e);for(const k in e.st){e.st[k]--;if(e.st[k]<=0)delete e.st[k];}}}
   // fires
   if(z.fires&&z.fires.length){for(const f of z.fires.slice()){f.t-=cost/100;if(f.t<=0){Gen.set(z,f.x,f.y,T.RUBBLE);z.fires.splice(z.fires.indexOf(f),1);this.recomputeLight();}else if(this.chance(0.03)&&!G.rain){const d=this.rc(DIRS8);const nx=f.x+d[0],ny=f.y+d[1];const t=Gen.get(z,nx,ny);if((t===T.FLOOR||t===T.RUBBLE||t===T.SIDEWALK||t===T.MOSS)&&!z.safe.some(s=>nx>=s.x&&nx<s.x+s.w&&ny>=s.y&&ny<s.y+s.h))this.igniteAt(nx,ny,1);}}}
   // toxic decay
@@ -155,7 +155,7 @@ const Game={
   if(this.isNight()&&G.turn%(G.nightmode?70:120)===0&&z.def.night&&z.def.night.length&&!this.inSafe(G.p.x,G.p.y)&&z.ents.filter(e=>e.kind==='e').length<28){const pick=this.rc(z.def.night);const grp=GROUPS[pick[0]];const spot=this.randomTileNear(G.p.x,G.p.y,9,15);if(spot&&grp)for(let i=0;i<Math.min(2,grp.length);i++)this.spawnEnemy(grp[i],spot.x,spot.y,{roam:1});}
   // echo ambient
   if(G.attention>=50&&this.chance(0.004*cost/100))this.echoMessage('whisper');},
- entTick(e){for(const k in e.st){e.st[k]--;if(e.st[k]<=0)delete e.st[k];}if(e.allyUntil&&G.turn>e.allyUntil){e.allyUntil=0;e.fac='echo';this.log(`${e.name} stops listening to you.`,'#ccf');}if(e.shield!==undefined&&e.shield!==null&&ENEMIES[e.def]&&ENEMIES[e.def].ai.includes('shield')&&e.shield<30){if(e.shieldCd>0)e.shieldCd--;else e.shield=Math.min(30,e.shield+5);}if(e.cd>0)e.cd--;if(e.alert>0)e.alert--;},
+ entTick(e){if(e.allyUntil&&G.turn>e.allyUntil){e.allyUntil=0;e.fac='echo';this.log(`${e.name} stops listening to you.`,'#ccf');}if(e.shield!==undefined&&e.shield!==null&&ENEMIES[e.def]&&ENEMIES[e.def].ai.includes('shield')&&e.shield<30){if(e.shieldCd>0)e.shieldCd--;else e.shield=Math.min(30,e.shield+5);}if(e.cd>0)e.cd--;if(e.alert>0)e.alert--;},
 
  // ---------- movement & interaction ----------
  move(dx,dy){const p=G.p;if(G.dead||G.ending)return;if(this.hasStatus('stun')){this.log('You are stunned.','#ff0');this.act(100);return;}
